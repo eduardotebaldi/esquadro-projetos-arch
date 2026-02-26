@@ -363,7 +363,7 @@ const RegistroHoras = () => {
                 <td colSpan={9} className="px-4 py-2 sticky left-0 bg-card z-10">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                      Ausências / Não trabalho
+                      Ausências
                     </p>
                     <Button
                       variant="ghost"
