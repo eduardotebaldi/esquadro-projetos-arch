@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import type { Status, Empreendimento, TipoProjeto } from '@/types/database';
+import type { Status, Empreendimento, TipoProjeto, Profile } from '@/types/database';
 
 interface PautaFiltersProps {
   onFiltersChange: (filters: Filters) => void;
@@ -14,33 +15,50 @@ export interface Filters {
   empreendimento_id: string;
   tipo_projeto_id: string;
   prioridade: string;
+  arquiteta_id: string;
 }
 
 const PautaFilters = ({ onFiltersChange }: PautaFiltersProps) => {
+  const { profile } = useAuth();
   const [filters, setFilters] = useState<Filters>({
     search: '',
     status_id: 'all',
     empreendimento_id: 'all',
     tipo_projeto_id: 'all',
     prioridade: 'all',
+    arquiteta_id: 'mine',
   });
   const [statusList, setStatusList] = useState<Status[]>([]);
   const [empreendimentos, setEmpreendimentos] = useState<Empreendimento[]>([]);
   const [tiposProjeto, setTiposProjeto] = useState<TipoProjeto[]>([]);
+  const [usuarios, setUsuarios] = useState<Profile[]>([]);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     const fetchFilterData = async () => {
-      const [s, e, t] = await Promise.all([
+      const [s, e, t, u] = await Promise.all([
         supabase.from('esquadro_status').select('*').eq('ativo', true).order('ordem'),
         supabase.from('esquadro_empreendimentos').select('*').eq('ativo', true).order('nome'),
         supabase.from('esquadro_tipos_projeto').select('*').eq('ativo', true).order('nome'),
+        supabase.from('esquadro_usuarios').select('*').eq('ativo', true).order('nome'),
       ]);
       setStatusList(s.data || []);
       setEmpreendimentos(e.data || []);
       setTiposProjeto(t.data || []);
+      setUsuarios((u.data as Profile[]) || []);
     };
     fetchFilterData();
   }, []);
+
+  // Emit initial filter with profile id once available
+  useEffect(() => {
+    if (!initialized && profile?.id) {
+      const initial = { ...filters, arquiteta_id: 'mine' };
+      setFilters(initial);
+      onFiltersChange(initial);
+      setInitialized(true);
+    }
+  }, [profile?.id, initialized]);
 
   const updateFilter = (key: keyof Filters, value: string) => {
     const updated = { ...filters, [key]: value };
@@ -56,6 +74,18 @@ const PautaFilters = ({ onFiltersChange }: PautaFiltersProps) => {
         onChange={(e) => updateFilter('search', e.target.value)}
         className="w-48"
       />
+      <Select value={filters.arquiteta_id} onValueChange={(v) => updateFilter('arquiteta_id', v)}>
+        <SelectTrigger className="w-48">
+          <SelectValue placeholder="Responsável" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="mine">Minhas demandas</SelectItem>
+          <SelectItem value="all">Todas</SelectItem>
+          {usuarios.map((u) => (
+            <SelectItem key={u.id} value={u.id}>{u.nome || u.email}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <Select value={filters.status_id} onValueChange={(v) => updateFilter('status_id', v)}>
         <SelectTrigger className="w-44">
           <SelectValue placeholder="Status" />
