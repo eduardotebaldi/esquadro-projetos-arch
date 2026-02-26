@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -40,7 +40,7 @@ type CellData = {
 };
 
 const RegistroHoras = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [weekStart, setWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
@@ -51,15 +51,20 @@ const RegistroHoras = () => {
   const [saving, setSaving] = useState(false);
   const [naoTrabalhadoDia, setNaoTrabalhadoDia] = useState<Record<string, string | null>>({});
 
-  const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
-  const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
+  const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 1 }), [weekStart]);
+  const days = useMemo(() => eachDayOfInterval({ start: weekStart, end: weekEnd }), [weekStart, weekEnd]);
 
   const fetchData = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
 
+    const weekEndLocal = endOfWeek(weekStart, { weekStartsOn: 1 });
     const dateFrom = format(weekStart, 'yyyy-MM-dd');
-    const dateTo = format(weekEnd, 'yyyy-MM-dd');
+    const dateTo = format(weekEndLocal, 'yyyy-MM-dd');
 
     const [demandasRes, horasRes, motivosRes] = await Promise.all([
       supabase
@@ -84,6 +89,13 @@ const RegistroHoras = () => {
         .order('nome'),
     ]);
 
+    if (demandasRes.error || horasRes.error || motivosRes.error) {
+      const message = demandasRes.error?.message || horasRes.error?.message || motivosRes.error?.message || 'Falha ao carregar registro de horas';
+      toast({ title: 'Erro ao carregar dados', description: message, variant: 'destructive' });
+      setLoading(false);
+      return;
+    }
+
     setDemandas(demandasRes.data || []);
     setMotivos(motivosRes.data || []);
 
@@ -107,7 +119,7 @@ const RegistroHoras = () => {
     setCells(cellMap);
     setNaoTrabalhadoDia(naoTrab);
     setLoading(false);
-  }, [user, weekStart, weekEnd]);
+  }, [user, weekStart]);
 
   useEffect(() => {
     fetchData();
@@ -187,6 +199,22 @@ const RegistroHoras = () => {
 
   const weekTotal = days.reduce((sum, day) => sum + getDayTotal(format(day, 'yyyy-MM-dd')), 0);
   const expectedTotal = days.reduce((sum, day) => sum + (HORAS_PADRAO[getDay(day)] || 0), 0);
+
+  if (profile?.role && profile.role !== 'arquiteta') {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div>
+          <h1 className="text-2xl font-bold">Registro de Horas</h1>
+          <p className="text-muted-foreground text-sm mt-1">Timesheet semanal</p>
+        </div>
+        <div className="bg-card border rounded-lg p-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            Apenas usuários com perfil Arquiteta podem registrar horas.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
