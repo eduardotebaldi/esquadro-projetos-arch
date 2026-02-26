@@ -121,51 +121,10 @@ const ConfigCrudTable = ({ tableName, title, columns, orderBy = 'created_at' }: 
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">{title}</h3>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" onClick={openNew}>
-              <Plus className="w-4 h-4 mr-1" />
-              Novo
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingId ? 'Editar' : 'Novo'} {title.slice(0, -1)}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              {columns.map((col) => (
-                <div key={col.key} className="space-y-1.5">
-                  <Label>{col.label}</Label>
-                  {col.type === 'textarea' ? (
-                    <Textarea
-                      value={formData[col.key] || ''}
-                      onChange={(e) => setFormData({ ...formData, [col.key]: e.target.value })}
-                    />
-                  ) : (
-                    <Input
-                      type={col.type === 'number' ? 'number' : 'text'}
-                      value={formData[col.key] ?? ''}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          [col.key]: col.type === 'number' ? Number(e.target.value) : e.target.value,
-                        })
-                      }
-                    />
-                  )}
-                </div>
-              ))}
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleSave}>
-                  {editingId ? 'Salvar' : 'Criar'}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button size="sm" onClick={openNew}>
+          <Plus className="w-4 h-4 mr-1" />
+          Novo
+        </Button>
       </div>
 
       <div className="border rounded-lg overflow-hidden">
@@ -217,6 +176,46 @@ const ConfigCrudTable = ({ tableName, title, columns, orderBy = 'created_at' }: 
           </tbody>
         </table>
       </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingId ? 'Editar' : 'Novo'} {title.slice(0, -1)}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {columns.map((col) => (
+              <div key={col.key} className="space-y-1.5">
+                <Label>{col.label}</Label>
+                {col.type === 'textarea' ? (
+                  <Textarea
+                    value={formData[col.key] || ''}
+                    onChange={(e) => setFormData({ ...formData, [col.key]: e.target.value })}
+                  />
+                ) : (
+                  <Input
+                    type={col.type === 'number' ? 'number' : 'text'}
+                    value={formData[col.key] ?? ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        [col.key]: col.type === 'number' ? Number(e.target.value) : e.target.value,
+                      })
+                    }
+                  />
+                )}
+              </div>
+            ))}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSave}>
+                {editingId ? 'Salvar' : 'Criar'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
