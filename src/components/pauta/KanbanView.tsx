@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import type { Status } from '@/types/database';
@@ -20,6 +21,16 @@ interface KanbanViewProps {
 const KanbanView = ({ demandas, onRefresh, onDemandaClick }: KanbanViewProps) => {
   const [statusList, setStatusList] = useState<Status[]>([]);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [collapsedColumns, setCollapsedColumns] = useState<Set<string>>(new Set());
+
+  const toggleCollapse = (statusId: string) => {
+    setCollapsedColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(statusId)) next.delete(statusId);
+      else next.add(statusId);
+      return next;
+    });
+  };
 
   useEffect(() => {
     const fetch = async () => {
@@ -68,6 +79,33 @@ const KanbanView = ({ demandas, onRefresh, onDemandaClick }: KanbanViewProps) =>
     <div className="flex gap-4 overflow-x-auto pb-4">
       {statusList.map((status) => {
         const columnDemandas = demandas.filter((d) => d.status_id === status.id);
+        const isCollapsed = collapsedColumns.has(status.id);
+
+        if (isCollapsed) {
+          return (
+            <div
+              key={status.id}
+              className="flex-shrink-0 w-10 bg-muted/50 rounded-lg flex flex-col items-center cursor-pointer hover:bg-muted/80 transition-colors"
+              onClick={() => toggleCollapse(status.id)}
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, status.id)}
+            >
+              <div className="py-3 flex flex-col items-center gap-2">
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                <Badge variant="secondary" className="text-xs">
+                  {columnDemandas.length}
+                </Badge>
+              </div>
+              <span
+                className="text-xs font-semibold text-muted-foreground"
+                style={{ writingMode: 'vertical-lr', textOrientation: 'mixed' }}
+              >
+                {status.nome}
+              </span>
+            </div>
+          );
+        }
+
         return (
           <div
             key={status.id}
@@ -76,8 +114,11 @@ const KanbanView = ({ demandas, onRefresh, onDemandaClick }: KanbanViewProps) =>
             onDrop={(e) => handleDrop(e, status.id)}
           >
             {/* Column header */}
-            <div className="px-3 py-3 border-b flex items-center justify-between">
-              <h3 className="text-sm font-semibold truncate">{status.nome}</h3>
+            <div
+              className="px-3 py-3 border-b flex items-center justify-between cursor-pointer hover:bg-muted/80 transition-colors rounded-t-lg"
+              onClick={() => toggleCollapse(status.id)}
+            >
+              <h3 className="text-sm font-semibold truncate select-none">{status.nome}</h3>
               <Badge variant="secondary" className="text-xs ml-2 flex-shrink-0">
                 {columnDemandas.length}
               </Badge>
