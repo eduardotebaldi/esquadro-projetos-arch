@@ -32,6 +32,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAdmin, loading } = useAuth();
+
+  if (loading) return null;
+  if (!isAdmin) return <Navigate to="/" replace />;
+  return <>{children}</>;
+};
+
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
 
@@ -62,8 +70,8 @@ const App = () => (
               <Route path="/comentarios" element={<Comentarios />} />
               <Route path="/historico" element={<Historico />} />
               <Route path="/horas" element={<RegistroHoras />} />
-              <Route path="/custos" element={<CustosIncorridos />} />
-              <Route path="/configuracoes" element={<Configuracoes />} />
+              <Route path="/custos" element={<AdminRoute><CustosIncorridos /></AdminRoute>} />
+              <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

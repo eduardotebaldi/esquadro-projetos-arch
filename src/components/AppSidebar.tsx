@@ -30,7 +30,7 @@ const adminItems = [
 ];
 
 const AppSidebar = () => {
-  const { signOut } = useAuth();
+  const { signOut, isAdmin, profile } = useAuth();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -68,27 +68,32 @@ const AppSidebar = () => {
           </NavLink>
         ))}
 
-        <div className={cn('my-4 border-t border-sidebar-border', collapsed && 'mx-2')} />
-
-        {adminItems.map((item) => (
-          <NavLink key={item.to} to={item.to} className={linkClass(item.to)}>
-            <item.icon className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && <span>{item.label}</span>}
-          </NavLink>
-        ))}
+        {isAdmin && (
+          <>
+            <div className={cn('my-4 border-t border-sidebar-border', collapsed && 'mx-2')} />
+            {adminItems.map((item) => (
+              <NavLink key={item.to} to={item.to} className={linkClass(item.to)}>
+                <item.icon className="w-5 h-5 flex-shrink-0" />
+                {!collapsed && <span>{item.label}</span>}
+              </NavLink>
+            ))}
+          </>
+        )}
       </nav>
 
-      {/* Footer */}
+      {/* User info + Footer */}
       <div className="px-2 pb-4 space-y-1">
+        {!collapsed && profile && (
+          <div className="px-3 py-2 mb-2">
+            <p className="text-xs text-sidebar-foreground/70 truncate">{profile.nome || profile.email}</p>
+            <p className="text-[10px] text-sidebar-muted capitalize">{profile.role}</p>
+          </div>
+        )}
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors w-full"
         >
-          {collapsed ? (
-            <ChevronRight className="w-5 h-5 flex-shrink-0" />
-          ) : (
-            <ChevronLeft className="w-5 h-5 flex-shrink-0" />
-          )}
+          {collapsed ? <ChevronRight className="w-5 h-5 flex-shrink-0" /> : <ChevronLeft className="w-5 h-5 flex-shrink-0" />}
           {!collapsed && <span>Recolher</span>}
         </button>
         <button

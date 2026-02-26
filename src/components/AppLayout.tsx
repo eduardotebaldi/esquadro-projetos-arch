@@ -4,7 +4,7 @@ import { Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const AppLayout = () => {
-  const { user } = useAuth();
+  const { profile } = useAuth();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -20,8 +20,15 @@ const AppLayout = () => {
                 3
               </span>
             </button>
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
-              {user?.email?.charAt(0).toUpperCase() || 'U'}
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
+                {profile?.nome?.charAt(0)?.toUpperCase() || profile?.email?.charAt(0)?.toUpperCase() || 'U'}
+              </div>
+              {profile && (
+                <span className="text-sm text-muted-foreground hidden sm:inline">
+                  {profile.nome || profile.email}
+                </span>
+              )}
             </div>
           </div>
         </header>
