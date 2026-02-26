@@ -45,7 +45,7 @@ const NovaDemandaDialog = ({ open, onOpenChange, onCreated }: NovaDemandaDialogP
         supabase.from('esquadro_status').select('*').eq('ativo', true).order('ordem'),
         supabase.from('esquadro_empreendimentos').select('*').eq('ativo', true).order('nome'),
         supabase.from('esquadro_tipos_projeto').select('*').eq('ativo', true).order('nome'),
-        supabase.from('esquadro_usuarios').select('*').eq('ativo', true).order('nome'),
+        supabase.from('esquadro_profiles').select('*').eq('ativo', true).order('nome'),
       ]);
       setStatusList(s.data || []);
       setEmpreendimentos(e.data || []);

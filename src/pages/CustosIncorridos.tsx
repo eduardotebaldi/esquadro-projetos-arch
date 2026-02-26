@@ -22,7 +22,7 @@ const CustosIncorridos = () => {
           tipo_projeto:esquadro_tipos_projeto(nome),
           status:esquadro_status(nome)
         `),
-        supabase.from('esquadro_usuarios').select('id, nome, email, custo_hora'),
+        supabase.from('esquadro_profiles').select('id, nome, email, custo_hora'),
         supabase.from('esquadro_registro_horas').select('demanda_id, user_id, horas'),
         supabase.from('esquadro_empreendimentos').select('*').eq('ativo', true).order('nome'),
       ]);
