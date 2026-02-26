@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Send } from 'lucide-react';
+import { Send, Pencil, Check, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -28,12 +28,15 @@ interface DemandaDetailDialogProps {
 }
 
 const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: DemandaDetailDialogProps) => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [comentarios, setComentarios] = useState<any[]>([]);
   const [novoTexto, setNovoTexto] = useState('');
   const [sending, setSending] = useState(false);
   const [loadingComments, setLoadingComments] = useState(false);
   const [updatingPrioridade, setUpdatingPrioridade] = useState(false);
+  const [editingInstrucoes, setEditingInstrucoes] = useState(false);
+  const [instrucoes, setInstrucoes] = useState('');
+  const [savingInstrucoes, setSavingInstrucoes] = useState(false);
 
   useEffect(() => {
     if (!demanda || !open) return;
@@ -85,6 +88,23 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
     setUpdatingPrioridade(false);
   };
 
+  const handleSaveInstrucoes = async () => {
+    if (!demanda) return;
+    setSavingInstrucoes(true);
+    const { error } = await supabase
+      .from('esquadro_demandas')
+      .update({ instrucoes: instrucoes.trim() })
+      .eq('id', demanda.id);
+    if (error) {
+      toast({ title: 'Erro ao salvar instruções', description: error.message, variant: 'destructive' });
+    } else {
+      demanda.instrucoes = instrucoes.trim();
+      setEditingInstrucoes(false);
+      onRefresh?.();
+    }
+    setSavingInstrucoes(false);
+  };
+
   if (!demanda) return null;
 
   return (
@@ -125,10 +145,41 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
         <ScrollArea className="flex-1 -mx-6 px-6">
           {/* Instruções */}
           <div className="space-y-2 mb-4">
-            <h4 className="text-sm font-semibold">Instruções</h4>
-            <div className="bg-muted rounded-md p-3 text-sm whitespace-pre-wrap min-h-[60px]">
-              {demanda.instrucoes || 'Nenhuma instrução registrada.'}
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold">Instruções</h4>
+              {isAdmin && !editingInstrucoes && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => { setInstrucoes(demanda.instrucoes || ''); setEditingInstrucoes(true); }}
+                >
+                  <Pencil className="w-3 h-3 mr-1" />
+                  Editar
+                </Button>
+              )}
             </div>
+            {editingInstrucoes ? (
+              <div className="space-y-2">
+                <Textarea
+                  value={instrucoes}
+                  onChange={(e) => setInstrucoes(e.target.value)}
+                  className="min-h-[80px] text-sm"
+                />
+                <div className="flex gap-1 justify-end">
+                  <Button variant="ghost" size="sm" className="h-7" onClick={() => setEditingInstrucoes(false)} disabled={savingInstrucoes}>
+                    <X className="w-3 h-3 mr-1" /> Cancelar
+                  </Button>
+                  <Button size="sm" className="h-7" onClick={handleSaveInstrucoes} disabled={savingInstrucoes}>
+                    <Check className="w-3 h-3 mr-1" /> Salvar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-muted rounded-md p-3 text-sm whitespace-pre-wrap min-h-[60px]">
+                {demanda.instrucoes || 'Nenhuma instrução registrada.'}
+              </div>
+            )}
           </div>
 
           <Separator className="my-4" />
