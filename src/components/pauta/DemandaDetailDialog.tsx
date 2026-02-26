@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Send } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -23,14 +24,16 @@ interface DemandaDetailDialogProps {
   demanda: any | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onRefresh?: () => void;
 }
 
-const DemandaDetailDialog = ({ demanda, open, onOpenChange }: DemandaDetailDialogProps) => {
+const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: DemandaDetailDialogProps) => {
   const { user } = useAuth();
   const [comentarios, setComentarios] = useState<any[]>([]);
   const [novoTexto, setNovoTexto] = useState('');
   const [sending, setSending] = useState(false);
   const [loadingComments, setLoadingComments] = useState(false);
+  const [updatingPrioridade, setUpdatingPrioridade] = useState(false);
 
   useEffect(() => {
     if (!demanda || !open) return;
@@ -66,6 +69,22 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange }: DemandaDetailDialo
     setSending(false);
   };
 
+  const handlePrioridadeChange = async (value: string) => {
+    if (!demanda) return;
+    setUpdatingPrioridade(true);
+    const { error } = await supabase
+      .from('esquadro_demandas')
+      .update({ prioridade: Number(value) })
+      .eq('id', demanda.id);
+    if (error) {
+      toast({ title: 'Erro ao atualizar prioridade', description: error.message, variant: 'destructive' });
+    } else {
+      demanda.prioridade = Number(value);
+      onRefresh?.();
+    }
+    setUpdatingPrioridade(false);
+  };
+
   if (!demanda) return null;
 
   return (
@@ -74,10 +93,24 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange }: DemandaDetailDialo
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {demanda.empreendimento?.nome || '—'}
-            <Badge className={`text-xs ${prioridadeColor[demanda.prioridade] || ''}`}>
-              {prioridadeLabel[demanda.prioridade] || '—'}
-            </Badge>
           </DialogTitle>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-muted-foreground">Prioridade:</span>
+            <Select
+              value={String(demanda.prioridade)}
+              onValueChange={handlePrioridadeChange}
+              disabled={updatingPrioridade}
+            >
+              <SelectTrigger className="h-7 w-28 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Alta</SelectItem>
+                <SelectItem value="2">Média</SelectItem>
+                <SelectItem value="3">Baixa</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <DialogDescription className="flex items-center gap-2 text-sm">
             {demanda.tipo_projeto?.nome || '—'} · Status: {demanda.status?.nome || '—'}
             {demanda.prazo && (
