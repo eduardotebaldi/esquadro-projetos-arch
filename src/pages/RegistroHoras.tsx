@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, Save } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Save, Plus, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import {
   format,
@@ -13,7 +13,6 @@ import {
   addWeeks,
   subWeeks,
   eachDayOfInterval,
-  isMonday,
   isSaturday,
   isSunday,
   getDay,
@@ -23,13 +22,13 @@ import { ptBR } from 'date-fns/locale';
 const DAY_NAMES_SHORT = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
 const HORAS_PADRAO: Record<number, number> = {
-  1: 8.75, // segunda
-  2: 8.5,  // terça
-  3: 8.5,  // quarta
-  4: 8.5,  // quinta
-  5: 8.5,  // sexta
-  6: 0,    // sábado
-  0: 0,    // domingo
+  1: 8.75,
+  2: 8.5,
+  3: 8.5,
+  4: 8.5,
+  5: 8.5,
+  6: 0,
+  0: 0,
 };
 
 type CellKey = string; // `${demanda_id}__${date}`
@@ -37,6 +36,13 @@ type CellData = {
   id?: string;
   horas: number | '';
   motivo_nao_trabalho_id: string | null;
+};
+
+// A "motivo row" is like a demanda row but for non-work reasons
+type MotivoRow = {
+  tempId: string;
+  motivoId: string;
+  horas: Record<string, number | ''>;  // date -> hours
 };
 
 const RegistroHoras = () => {
@@ -47,34 +53,24 @@ const RegistroHoras = () => {
   const [demandas, setDemandas] = useState<any[]>([]);
   const [cells, setCells] = useState<Record<CellKey, CellData>>({});
   const [motivos, setMotivos] = useState<any[]>([]);
+  const [motivoRows, setMotivoRows] = useState<MotivoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [naoTrabalhadoDia, setNaoTrabalhadoDia] = useState<Record<string, string | null>>({});
 
   const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 1 }), [weekStart]);
   const days = useMemo(() => eachDayOfInterval({ start: weekStart, end: weekEnd }), [weekStart, weekEnd]);
 
   const fetchData = useCallback(async () => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
+    if (!user) { setLoading(false); return; }
     setLoading(true);
 
-    const weekEndLocal = endOfWeek(weekStart, { weekStartsOn: 1 });
     const dateFrom = format(weekStart, 'yyyy-MM-dd');
-    const dateTo = format(weekEndLocal, 'yyyy-MM-dd');
+    const dateTo = format(endOfWeek(weekStart, { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
     const [demandasRes, horasRes, motivosRes] = await Promise.all([
       supabase
         .from('esquadro_demandas')
-        .select(`
-          id,
-          empreendimento:esquadro_empreendimentos(nome),
-          tipo_projeto:esquadro_tipos_projeto(nome),
-          status:esquadro_status(nome)
-        `)
+        .select(`id, empreendimento:esquadro_empreendimentos(nome), tipo_projeto:esquadro_tipos_projeto(nome), status:esquadro_status(nome)`)
         .order('prioridade'),
       supabase
         .from('esquadro_registro_horas')
@@ -90,8 +86,7 @@ const RegistroHoras = () => {
     ]);
 
     if (demandasRes.error || horasRes.error || motivosRes.error) {
-      const message = demandasRes.error?.message || horasRes.error?.message || motivosRes.error?.message || 'Falha ao carregar registro de horas';
-      toast({ title: 'Erro ao carregar dados', description: message, variant: 'destructive' });
+      toast({ title: 'Erro ao carregar dados', description: demandasRes.error?.message || horasRes.error?.message || motivosRes.error?.message, variant: 'destructive' });
       setLoading(false);
       return;
     }
@@ -99,31 +94,36 @@ const RegistroHoras = () => {
     setDemandas(demandasRes.data || []);
     setMotivos(motivosRes.data || []);
 
-    // Build cells map
     const cellMap: Record<CellKey, CellData> = {};
-    const naoTrab: Record<string, string | null> = {};
+    // Group motivo entries by motivo_id to build rows
+    const motivoMap: Record<string, Record<string, number>> = {};
 
     (horasRes.data || []).forEach((r: any) => {
       if (r.demanda_id) {
-        const key = `${r.demanda_id}__${r.data}`;
-        cellMap[key] = {
+        cellMap[`${r.demanda_id}__${r.data}`] = {
           id: r.id,
           horas: r.horas ?? '',
-          motivo_nao_trabalho_id: r.motivo_nao_trabalho_id,
+          motivo_nao_trabalho_id: null,
         };
       } else if (r.motivo_nao_trabalho_id) {
-        naoTrab[r.data] = r.motivo_nao_trabalho_id;
+        if (!motivoMap[r.motivo_nao_trabalho_id]) motivoMap[r.motivo_nao_trabalho_id] = {};
+        motivoMap[r.motivo_nao_trabalho_id][r.data] = r.horas || 0;
       }
     });
 
     setCells(cellMap);
-    setNaoTrabalhadoDia(naoTrab);
+
+    // Build motivo rows from existing data
+    const rows: MotivoRow[] = Object.entries(motivoMap).map(([motivoId, horas]) => ({
+      tempId: crypto.randomUUID(),
+      motivoId,
+      horas: Object.fromEntries(Object.entries(horas).map(([d, h]) => [d, h || ''])),
+    }));
+    setMotivoRows(rows);
     setLoading(false);
   }, [user, weekStart]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const updateCell = (demandaId: string, date: string, horas: string) => {
     const key = `${demandaId}__${date}`;
@@ -134,20 +134,51 @@ const RegistroHoras = () => {
     }));
   };
 
+  const addMotivoRow = () => {
+    setMotivoRows((prev) => [...prev, { tempId: crypto.randomUUID(), motivoId: '', horas: {} }]);
+  };
+
+  const removeMotivoRow = (tempId: string) => {
+    setMotivoRows((prev) => prev.filter((r) => r.tempId !== tempId));
+  };
+
+  const updateMotivoRowMotivo = (tempId: string, motivoId: string) => {
+    setMotivoRows((prev) => prev.map((r) => r.tempId === tempId ? { ...r, motivoId } : r));
+  };
+
+  const updateMotivoRowHoras = (tempId: string, date: string, value: string) => {
+    const val = value === '' ? '' : parseFloat(value);
+    setMotivoRows((prev) =>
+      prev.map((r) =>
+        r.tempId === tempId
+          ? { ...r, horas: { ...r.horas, [date]: isNaN(val as number) ? '' : val } }
+          : r
+      )
+    );
+  };
+
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
 
-    const upserts: any[] = [];
-    const existingIds: string[] = [];
+    const dateFrom = format(weekStart, 'yyyy-MM-dd');
+    const dateTo = format(weekEnd, 'yyyy-MM-dd');
 
-    // Collect all cell data
+    // Delete all records for this week
+    await supabase
+      .from('esquadro_registro_horas')
+      .delete()
+      .eq('user_id', user.id)
+      .gte('data', dateFrom)
+      .lte('data', dateTo);
+
+    const inserts: any[] = [];
+
+    // Demanda hours
     Object.entries(cells).forEach(([key, cell]) => {
       if (cell.horas === '' || cell.horas === 0) return;
       const [demanda_id, data] = key.split('__');
-      if (cell.id) existingIds.push(cell.id);
-      upserts.push({
-        ...(cell.id ? { id: cell.id } : {}),
+      inserts.push({
         demanda_id,
         user_id: user.id,
         data,
@@ -156,35 +187,23 @@ const RegistroHoras = () => {
       });
     });
 
-    // Delete existing records for this week first, then insert
-    const dateFrom = format(weekStart, 'yyyy-MM-dd');
-    const dateTo = format(weekEnd, 'yyyy-MM-dd');
-
-    await supabase
-      .from('esquadro_registro_horas')
-      .delete()
-      .eq('user_id', user.id)
-      .gte('data', dateFrom)
-      .lte('data', dateTo);
-
-    // Add motivos de não-trabalho
-    Object.entries(naoTrabalhadoDia).forEach(([data, motivoId]) => {
-      if (!motivoId) return;
-      upserts.push({
-        demanda_id: null,
-        user_id: user.id,
-        data,
-        horas: 0,
-        motivo_nao_trabalho_id: motivoId,
+    // Motivo rows
+    motivoRows.forEach((row) => {
+      if (!row.motivoId) return;
+      Object.entries(row.horas).forEach(([data, h]) => {
+        if (h === '' || h === 0) return;
+        inserts.push({
+          demanda_id: null,
+          user_id: user.id,
+          data,
+          horas: Number(h),
+          motivo_nao_trabalho_id: row.motivoId,
+        });
       });
     });
 
-    if (upserts.length > 0) {
-      const cleanUpserts = upserts.map(({ id, ...rest }) => rest);
-      const { error } = await supabase
-        .from('esquadro_registro_horas')
-        .insert(cleanUpserts);
-
+    if (inserts.length > 0) {
+      const { error } = await supabase.from('esquadro_registro_horas').insert(inserts);
       if (error) {
         toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' });
         setSaving(false);
@@ -198,15 +217,24 @@ const RegistroHoras = () => {
   };
 
   const getDayTotal = (date: string) => {
-    return Object.entries(cells)
+    const demandaHours = Object.entries(cells)
       .filter(([key]) => key.endsWith(`__${date}`))
       .reduce((sum, [, cell]) => sum + (typeof cell.horas === 'number' ? cell.horas : 0), 0);
+    const motivoHours = motivoRows.reduce((sum, row) => {
+      const h = row.horas[date];
+      return sum + (typeof h === 'number' ? h : 0);
+    }, 0);
+    return demandaHours + motivoHours;
   };
 
   const getDemandaTotal = (demandaId: string) => {
     return Object.entries(cells)
       .filter(([key]) => key.startsWith(`${demandaId}__`))
       .reduce((sum, [, cell]) => sum + (typeof cell.horas === 'number' ? cell.horas : 0), 0);
+  };
+
+  const getMotivoRowTotal = (row: MotivoRow) => {
+    return Object.values(row.horas).reduce<number>((sum, h) => sum + (typeof h === 'number' ? h : 0), 0);
   };
 
   const weekTotal = days.reduce((sum, day) => sum + getDayTotal(format(day, 'yyyy-MM-dd')), 0);
@@ -260,17 +288,12 @@ const RegistroHoras = () => {
           <thead>
             <tr className="bg-muted">
               <th className="text-left px-4 py-3 font-medium text-muted-foreground min-w-[220px] sticky left-0 bg-muted z-10">
-                Demanda
+                Atividade
               </th>
               {days.map((day, i) => {
                 const isWeekend = isSaturday(day) || isSunday(day);
                 return (
-                  <th
-                    key={i}
-                    className={`text-center px-2 py-3 font-medium min-w-[80px] ${
-                      isWeekend ? 'text-muted-foreground/50' : 'text-muted-foreground'
-                    }`}
-                  >
+                  <th key={i} className={`text-center px-2 py-3 font-medium min-w-[80px] ${isWeekend ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
                     <div>{DAY_NAMES_SHORT[i]}</div>
                     <div className="text-xs font-normal">{format(day, 'dd/MM')}</div>
                   </th>
@@ -287,79 +310,91 @@ const RegistroHoras = () => {
                 </td>
               </tr>
             )}
-            {!loading && demandas.length === 0 && (
+            {!loading && demandas.length === 0 && motivoRows.length === 0 && (
               <tr>
                 <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
                   Nenhuma demanda encontrada.
                 </td>
               </tr>
             )}
-            {!loading &&
-              demandas.map((d: any) => {
-                const demandaTotal = getDemandaTotal(d.id);
-                return (
-                  <tr key={d.id} className="border-t">
-                    <td className="px-4 py-2 sticky left-0 bg-card z-10">
-                      <p className="font-medium text-xs truncate max-w-[200px]">
-                        {d.empreendimento?.nome}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                        {d.tipo_projeto?.nome}
-                      </p>
-                    </td>
-                    {days.map((day, i) => {
-                      const dateStr = format(day, 'yyyy-MM-dd');
-                      const key = `${d.id}__${dateStr}`;
-                      const cell = cells[key];
-                      const isWeekend = isSaturday(day) || isSunday(day);
-                      return (
-                        <td key={i} className={`px-1 py-2 text-center ${isWeekend ? 'bg-muted/30' : ''}`}>
-                          <Input
-                            type="number"
-                            step="0.25"
-                            min="0"
-                            max="24"
-                            value={cell?.horas ?? ''}
-                            onChange={(e) => updateCell(d.id, dateStr, e.target.value)}
-                            className="w-16 mx-auto text-center h-8 text-xs tabular-nums"
-                          />
-                        </td>
-                      );
-                    })}
-                    <td className="px-3 py-2 text-center font-medium tabular-nums text-xs">
-                      {demandaTotal > 0 ? `${demandaTotal}h` : '—'}
-                    </td>
-                  </tr>
-                );
-              })}
 
+            {/* Demanda rows */}
+            {!loading && demandas.map((d: any) => {
+              const demandaTotal = getDemandaTotal(d.id);
+              return (
+                <tr key={d.id} className="border-t">
+                  <td className="px-4 py-2 sticky left-0 bg-card z-10">
+                    <p className="font-medium text-xs truncate max-w-[200px]">
+                      {d.empreendimento?.nome}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                      {d.tipo_projeto?.nome}
+                    </p>
+                  </td>
+                  {days.map((day, i) => {
+                    const dateStr = format(day, 'yyyy-MM-dd');
+                    const key = `${d.id}__${dateStr}`;
+                    const cell = cells[key];
+                    const isWeekend = isSaturday(day) || isSunday(day);
+                    return (
+                      <td key={i} className={`px-1 py-2 text-center ${isWeekend ? 'bg-muted/30' : ''}`}>
+                        <Input
+                          type="number"
+                          step="0.25"
+                          min="0"
+                          max="24"
+                          value={cell?.horas ?? ''}
+                          onChange={(e) => updateCell(d.id, dateStr, e.target.value)}
+                          className="w-16 mx-auto text-center h-8 text-xs tabular-nums"
+                        />
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-2 text-center font-medium tabular-nums text-xs">
+                    {demandaTotal > 0 ? `${demandaTotal}h` : '—'}
+                  </td>
+                </tr>
+              );
+            })}
 
-            {/* Motivo de não-trabalho row */}
-            {!loading && motivos.length > 0 && (
-              <tr className="border-t border-dashed bg-muted/20">
-                <td className="px-4 py-2 sticky left-0 bg-muted/20 z-10">
-                  <p className="font-medium text-xs text-muted-foreground">Não trabalhou</p>
-                  <p className="text-[10px] text-muted-foreground">Selecione o motivo</p>
+            {/* Separator between demandas and motivos */}
+            {!loading && (demandas.length > 0 || motivoRows.length > 0) && (
+              <tr className="border-t-2 border-dashed border-muted-foreground/20">
+                <td colSpan={9} className="px-4 py-2 sticky left-0 bg-card z-10">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Ausências / Não trabalho
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                      onClick={addMotivoRow}
+                    >
+                      <Plus className="w-3 h-3" />
+                      Adicionar motivo
+                    </Button>
+                  </div>
                 </td>
-                {days.map((day, i) => {
-                  const dateStr = format(day, 'yyyy-MM-dd');
-                  const isWeekend = isSaturday(day) || isSunday(day);
-                  return (
-                    <td key={i} className={`px-1 py-2 text-center ${isWeekend ? 'bg-muted/30' : ''}`}>
+              </tr>
+            )}
+
+            {/* Motivo rows — each row = one reason with hours per day */}
+            {!loading && motivoRows.map((row) => {
+              const rowTotal = getMotivoRowTotal(row);
+              return (
+                <tr key={row.tempId} className="border-t border-dashed">
+                  <td className="px-4 py-2 sticky left-0 bg-card z-10">
+                    <div className="flex items-center gap-1">
                       <Select
-                        value={naoTrabalhadoDia[dateStr] || 'none'}
-                        onValueChange={(v) =>
-                          setNaoTrabalhadoDia((prev) => ({
-                            ...prev,
-                            [dateStr]: v === 'none' ? null : v,
-                          }))
-                        }
+                        value={row.motivoId || 'none'}
+                        onValueChange={(v) => updateMotivoRowMotivo(row.tempId, v === 'none' ? '' : v)}
                       >
-                        <SelectTrigger className="w-16 mx-auto h-8 text-[10px] px-1">
-                          <SelectValue placeholder="—" />
+                        <SelectTrigger className="h-8 text-xs w-[170px]">
+                          <SelectValue placeholder="Selecione o motivo" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">—</SelectItem>
+                          <SelectItem value="none">Selecione...</SelectItem>
                           {motivos.map((m: any) => (
                             <SelectItem key={m.id} value={m.id}>
                               {m.nome}
@@ -367,15 +402,43 @@ const RegistroHoras = () => {
                           ))}
                         </SelectContent>
                       </Select>
-                    </td>
-                  );
-                })}
-                <td className="px-3 py-2"></td>
-              </tr>
-            )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
+                        onClick={() => removeMotivoRow(row.tempId)}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </td>
+                  {days.map((day, i) => {
+                    const dateStr = format(day, 'yyyy-MM-dd');
+                    const isWeekend = isSaturday(day) || isSunday(day);
+                    return (
+                      <td key={i} className={`px-1 py-2 text-center ${isWeekend ? 'bg-muted/30' : ''}`}>
+                        <Input
+                          type="number"
+                          step="0.25"
+                          min="0"
+                          max="24"
+                          value={row.horas[dateStr] ?? ''}
+                          onChange={(e) => updateMotivoRowHoras(row.tempId, dateStr, e.target.value)}
+                          className="w-16 mx-auto text-center h-8 text-xs tabular-nums"
+                          disabled={!row.motivoId}
+                        />
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-2 text-center font-medium tabular-nums text-xs text-muted-foreground">
+                    {rowTotal > 0 ? `${rowTotal}h` : '—'}
+                  </td>
+                </tr>
+              );
+            })}
 
             {/* Totals row */}
-            {!loading && demandas.length > 0 && (
+            {!loading && (demandas.length > 0 || motivoRows.length > 0) && (
               <tr className="border-t-2 border-primary/20 bg-muted/50 font-medium">
                 <td className="px-4 py-3 sticky left-0 bg-muted/50 z-10 text-sm">Total do Dia</td>
                 {days.map((day, i) => {
@@ -406,7 +469,7 @@ const RegistroHoras = () => {
       </div>
 
       {/* Legend */}
-      <div className="flex gap-6 text-xs text-muted-foreground">
+      <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
         <span>Horas padrão: Seg 8,75h · Ter–Sex 8,5h · Fim de semana 0h</span>
         <span className="text-accent">● Hora extra</span>
       </div>
