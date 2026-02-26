@@ -186,6 +186,7 @@ const PautaGeral = () => {
         demanda={selectedDemanda}
         open={detailOpen}
         onOpenChange={setDetailOpen}
+        onRefresh={fetchDemandas}
       />
     </div>
   );

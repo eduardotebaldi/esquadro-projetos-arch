@@ -19,14 +19,15 @@ export interface Filters {
 }
 
 const PautaFilters = ({ onFiltersChange }: PautaFiltersProps) => {
-  const { profile } = useAuth();
+  const { profile, isAdmin } = useAuth();
+  const defaultArquiteta = isAdmin ? 'all' : 'mine';
   const [filters, setFilters] = useState<Filters>({
     search: '',
     status_id: 'all',
     empreendimento_id: 'all',
     tipo_projeto_id: 'all',
     prioridade: 'all',
-    arquiteta_id: 'mine',
+    arquiteta_id: defaultArquiteta,
   });
   const [statusList, setStatusList] = useState<Status[]>([]);
   const [empreendimentos, setEmpreendimentos] = useState<Empreendimento[]>([]);
@@ -53,7 +54,7 @@ const PautaFilters = ({ onFiltersChange }: PautaFiltersProps) => {
   // Emit initial filter with profile id once available
   useEffect(() => {
     if (!initialized && profile?.id) {
-      const initial = { ...filters, arquiteta_id: 'mine' };
+      const initial = { ...filters, arquiteta_id: defaultArquiteta };
       setFilters(initial);
       onFiltersChange(initial);
       setInitialized(true);
