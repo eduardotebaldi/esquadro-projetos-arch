@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import type { Status, Empreendimento, TipoProjeto } from '@/types/database';
+import type { Status, Empreendimento, TipoProjeto, Profile } from '@/types/database';
 
 interface NovaDemandaDialogProps {
   open: boolean;
@@ -24,12 +24,14 @@ const NovaDemandaDialog = ({ open, onOpenChange, onCreated }: NovaDemandaDialogP
   const [statusList, setStatusList] = useState<Status[]>([]);
   const [empreendimentos, setEmpreendimentos] = useState<Empreendimento[]>([]);
   const [tiposProjeto, setTiposProjeto] = useState<TipoProjeto[]>([]);
+  const [usuarios, setUsuarios] = useState<Profile[]>([]);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
     empreendimento_id: '',
     tipo_projeto_id: '',
     status_id: '',
+    arquiteta_id: '',
     prioridade: 2,
     prazo: '',
     horas_estimadas: '',
@@ -39,14 +41,16 @@ const NovaDemandaDialog = ({ open, onOpenChange, onCreated }: NovaDemandaDialogP
   useEffect(() => {
     if (!open) return;
     const fetchData = async () => {
-      const [s, e, t] = await Promise.all([
+      const [s, e, t, u] = await Promise.all([
         supabase.from('esquadro_status').select('*').eq('ativo', true).order('ordem'),
         supabase.from('esquadro_empreendimentos').select('*').eq('ativo', true).order('nome'),
         supabase.from('esquadro_tipos_projeto').select('*').eq('ativo', true).order('nome'),
+        supabase.from('esquadro_usuarios').select('*').eq('ativo', true).order('nome'),
       ]);
       setStatusList(s.data || []);
       setEmpreendimentos(e.data || []);
       setTiposProjeto(t.data || []);
+      setUsuarios((u.data as Profile[]) || []);
     };
     fetchData();
   }, [open]);
@@ -62,6 +66,7 @@ const NovaDemandaDialog = ({ open, onOpenChange, onCreated }: NovaDemandaDialogP
       empreendimento_id: form.empreendimento_id,
       tipo_projeto_id: form.tipo_projeto_id,
       status_id: form.status_id,
+      arquiteta_id: form.arquiteta_id || null,
       prioridade: form.prioridade,
       prazo: form.prazo || null,
       horas_estimadas: form.horas_estimadas ? Number(form.horas_estimadas) : null,
@@ -79,6 +84,7 @@ const NovaDemandaDialog = ({ open, onOpenChange, onCreated }: NovaDemandaDialogP
         empreendimento_id: '',
         tipo_projeto_id: '',
         status_id: '',
+        arquiteta_id: '',
         prioridade: 2,
         prazo: '',
         horas_estimadas: '',
@@ -134,6 +140,20 @@ const NovaDemandaDialog = ({ open, onOpenChange, onCreated }: NovaDemandaDialogP
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1.5">
+              <Label>Responsável</Label>
+              <Select value={form.arquiteta_id} onValueChange={(v) => updateField('arquiteta_id', v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <SelectContent>
+                  {usuarios.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.nome || u.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>Prioridade</Label>
               <Select value={String(form.prioridade)} onValueChange={(v) => updateField('prioridade', Number(v))}>
