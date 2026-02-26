@@ -4,7 +4,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, Save, Plus, X } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Badge } from '@/components/ui/badge';
+import { ChevronLeft, ChevronRight, Save, Plus, X, Check, ChevronsUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import {
   format,
@@ -61,7 +65,8 @@ const RegistroHoras = () => {
   const [statusList, setStatusList] = useState<any[]>([]);
   const [empreendimentos, setEmpreendimentos] = useState<any[]>([]);
   const [filterStatus, setFilterStatus] = useState<string>(EM_ANDAMENTO_ID);
-  const [filterEmpreendimento, setFilterEmpreendimento] = useState<string>('all');
+  const [filterEmpreendimentos, setFilterEmpreendimentos] = useState<string[]>([]);
+  const [empreendimentoPopoverOpen, setEmpreendimentoPopoverOpen] = useState(false);
 
   const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 1 }), [weekStart]);
   const days = useMemo(() => eachDayOfInterval({ start: weekStart, end: weekEnd }), [weekStart, weekEnd]);
@@ -94,8 +99,8 @@ const RegistroHoras = () => {
     if (filterStatus !== 'all') {
       demandasQuery = demandasQuery.eq('status_id', filterStatus);
     }
-    if (filterEmpreendimento !== 'all') {
-      demandasQuery = demandasQuery.eq('empreendimento_id', filterEmpreendimento);
+    if (filterEmpreendimentos.length > 0) {
+      demandasQuery = demandasQuery.in('empreendimento_id', filterEmpreendimentos);
     }
 
     const [demandasRes, horasRes, motivosRes] = await Promise.all([
@@ -149,7 +154,7 @@ const RegistroHoras = () => {
     }));
     setMotivoRows(rows);
     setLoading(false);
-  }, [user, weekStart, filterStatus, filterEmpreendimento]);
+  }, [user, weekStart, filterStatus, filterEmpreendimentos]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -323,17 +328,67 @@ const RegistroHoras = () => {
             ))}
           </SelectContent>
         </Select>
-        <Select value={filterEmpreendimento} onValueChange={setFilterEmpreendimento}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Empreendimento" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos empreendimentos</SelectItem>
-            {empreendimentos.map((e: any) => (
-              <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Popover open={empreendimentoPopoverOpen} onOpenChange={setEmpreendimentoPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" className="w-64 justify-between h-9 text-sm font-normal">
+              {filterEmpreendimentos.length === 0
+                ? 'Todos empreendimentos'
+                : `${filterEmpreendimentos.length} selecionado(s)`}
+              <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-0" align="start">
+            <Command>
+              <CommandInput placeholder="Buscar empreendimento..." />
+              <CommandList>
+                <CommandEmpty>Nenhum encontrado.</CommandEmpty>
+                <CommandGroup>
+                  {empreendimentos.map((e: any) => {
+                    const isSelected = filterEmpreendimentos.includes(e.id);
+                    return (
+                      <CommandItem
+                        key={e.id}
+                        value={e.nome}
+                        onSelect={() => {
+                          setFilterEmpreendimentos((prev) =>
+                            isSelected ? prev.filter((id) => id !== e.id) : [...prev, e.id]
+                          );
+                        }}
+                      >
+                        <Check className={cn("mr-2 h-4 w-4", isSelected ? "opacity-100" : "opacity-0")} />
+                        {e.nome}
+                      </CommandItem>
+                    );
+                  })}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+        {filterEmpreendimentos.length > 0 && (
+          <div className="flex flex-wrap gap-1 items-center">
+            {filterEmpreendimentos.map((id) => {
+              const emp = empreendimentos.find((e: any) => e.id === id);
+              return (
+                <Badge key={id} variant="secondary" className="text-xs gap-1">
+                  {emp?.nome}
+                  <X
+                    className="h-3 w-3 cursor-pointer"
+                    onClick={() => setFilterEmpreendimentos((prev) => prev.filter((i) => i !== id))}
+                  />
+                </Badge>
+              );
+            })}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs text-muted-foreground"
+              onClick={() => setFilterEmpreendimentos([])}
+            >
+              Limpar
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="border rounded-lg overflow-x-auto bg-card">
