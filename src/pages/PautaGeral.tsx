@@ -2,9 +2,11 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, LayoutGrid, Table as TableIcon } from 'lucide-react';
 import PautaFilters, { type Filters } from '@/components/pauta/PautaFilters';
 import NovaDemandaDialog from '@/components/pauta/NovaDemandaDialog';
+import KanbanView from '@/components/pauta/KanbanView';
 import { format } from 'date-fns';
 
 const prioridadeLabel: Record<number, string> = { 1: 'Alta', 2: 'Média', 3: 'Baixa' };
@@ -80,58 +82,75 @@ const PautaGeral = () => {
 
       <PautaFilters onFiltersChange={setFilters} />
 
-      <div className="border rounded-lg overflow-hidden bg-card">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-muted">
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Empreendimento</th>
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Tipo de Projeto</th>
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-              <th className="text-center px-4 py-3 font-medium text-muted-foreground">Prioridade</th>
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground">Prazo</th>
-              <th className="text-right px-4 py-3 font-medium text-muted-foreground">Horas Est.</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                  Carregando...
-                </td>
-              </tr>
-            )}
-            {!loading && demandas.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                  Nenhuma demanda encontrada.
-                </td>
-              </tr>
-            )}
-            {demandas.map((d) => (
-              <tr key={d.id} className="border-t hover:bg-muted/50 transition-colors cursor-pointer">
-                <td className="px-4 py-3 font-medium">{d.empreendimento?.nome || '—'}</td>
-                <td className="px-4 py-3">{d.tipo_projeto?.nome || '—'}</td>
-                <td className="px-4 py-3">
-                  <Badge variant="secondary" className="font-normal">
-                    {d.status?.nome || '—'}
-                  </Badge>
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <Badge className={prioridadeColor[d.prioridade as number] || ''}>
-                    {prioridadeLabel[d.prioridade as number] || d.prioridade}
-                  </Badge>
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">
-                  {d.prazo ? format(new Date(d.prazo), 'dd/MM/yyyy') : '—'}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums">
-                  {d.horas_estimadas != null ? `${d.horas_estimadas}h` : '—'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Tabs defaultValue="kanban" className="space-y-4">
+        <TabsList className="bg-muted">
+          <TabsTrigger value="kanban" className="gap-1.5">
+            <LayoutGrid className="w-4 h-4" />
+            Kanban
+          </TabsTrigger>
+          <TabsTrigger value="tabela" className="gap-1.5">
+            <TableIcon className="w-4 h-4" />
+            Tabela
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="kanban">
+          {loading ? (
+            <div className="text-sm text-muted-foreground py-8 text-center">Carregando...</div>
+          ) : (
+            <KanbanView demandas={demandas} onRefresh={fetchDemandas} />
+          )}
+        </TabsContent>
+
+        <TabsContent value="tabela">
+          <div className="border rounded-lg overflow-hidden bg-card">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted">
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Empreendimento</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Tipo de Projeto</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
+                  <th className="text-center px-4 py-3 font-medium text-muted-foreground">Prioridade</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Prazo</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Horas Est.</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Carregando...</td>
+                  </tr>
+                )}
+                {!loading && demandas.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Nenhuma demanda encontrada.</td>
+                  </tr>
+                )}
+                {demandas.map((d) => (
+                  <tr key={d.id} className="border-t hover:bg-muted/50 transition-colors cursor-pointer">
+                    <td className="px-4 py-3 font-medium">{d.empreendimento?.nome || '—'}</td>
+                    <td className="px-4 py-3">{d.tipo_projeto?.nome || '—'}</td>
+                    <td className="px-4 py-3">
+                      <Badge variant="secondary" className="font-normal">{d.status?.nome || '—'}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <Badge className={prioridadeColor[d.prioridade as number] || ''}>
+                        {prioridadeLabel[d.prioridade as number] || d.prioridade}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {d.prazo ? format(new Date(d.prazo), 'dd/MM/yyyy') : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {d.horas_estimadas != null ? `${d.horas_estimadas}h` : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </TabsContent>
+      </Tabs>
 
       <NovaDemandaDialog
         open={dialogOpen}
