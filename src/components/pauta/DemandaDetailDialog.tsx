@@ -48,10 +48,26 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
     setLoadingComments(true);
     const { data } = await supabase
       .from('esquadro_comentarios')
-      .select('*, usuario:esquadro_profiles(nome, email)')
+      .select('*')
       .eq('demanda_id', demanda.id)
       .order('created_at', { ascending: true });
-    setComentarios(data || []);
+
+    // Fetch profiles for comment authors
+    const comments = data || [];
+    if (comments.length > 0) {
+      const userIds = [...new Set(comments.map((c: any) => c.user_id).filter(Boolean))];
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('esquadro_profiles')
+          .select('id, nome, email')
+          .in('id', userIds);
+        const profileMap = new Map((profiles || []).map((p: any) => [p.id, p]));
+        comments.forEach((c: any) => {
+          c.usuario = profileMap.get(c.user_id) || null;
+        });
+      }
+    }
+    setComentarios(comments);
     setLoadingComments(false);
   };
 
