@@ -42,7 +42,7 @@ const ConfigUsuarios = () => {
 
   const fetchUsuarios = async () => {
     const { data, error } = await supabase
-      .from('esquadro_usuarios')
+      .from('esquadro_profiles')
       .select('*')
       .order('nome');
     if (!error) setUsuarios(data || []);
@@ -92,7 +92,7 @@ const ConfigUsuarios = () => {
       };
 
       const { error } = await supabase
-        .from('esquadro_usuarios')
+        .from('esquadro_profiles')
         .update(updateData)
         .eq('id', editingId);
 
@@ -114,7 +114,7 @@ const ConfigUsuarios = () => {
       // The auth user should be created separately or via admin API
       // For now, we insert the profile record
       const { error } = await supabase
-        .from('esquadro_usuarios')
+        .from('esquadro_profiles')
         .insert({
           email: form.email,
           nome: form.nome || null,
@@ -138,7 +138,7 @@ const ConfigUsuarios = () => {
 
   const toggleAtivo = async (id: string, current: boolean) => {
     const { error } = await supabase
-      .from('esquadro_usuarios')
+      .from('esquadro_profiles')
       .update({ ativo: !current })
       .eq('id', id);
     if (error) {

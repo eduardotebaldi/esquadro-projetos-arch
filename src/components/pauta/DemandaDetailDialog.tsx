@@ -42,7 +42,7 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange }: DemandaDetailDialo
     setLoadingComments(true);
     const { data } = await supabase
       .from('esquadro_comentarios')
-      .select('*, usuario:esquadro_usuarios(nome, email)')
+      .select('*, usuario:esquadro_profiles(nome, email)')
       .eq('demanda_id', demanda.id)
       .order('created_at', { ascending: true });
     setComentarios(data || []);

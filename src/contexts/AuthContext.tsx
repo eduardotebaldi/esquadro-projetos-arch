@@ -31,7 +31,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (email: string) => {
     const { data } = await supabase
-      .from('esquadro_usuarios')
+      .from('esquadro_profiles')
       .select('*')
       .eq('email', email)
       .eq('ativo', true)
