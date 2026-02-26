@@ -1,75 +1,123 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Building2, ClipboardList, AlertTriangle, Clock } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Building2, ClipboardList, AlertTriangle, Clock, CheckCircle2, Users } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 
+const prioridadeLabel: Record<number, string> = { 1: 'Alta', 2: 'Média', 3: 'Baixa' };
+const prioridadeColor: Record<number, string> = {
+  1: 'bg-destructive text-destructive-foreground',
+  2: 'bg-accent text-accent-foreground',
+  3: 'bg-muted text-muted-foreground',
+};
+
 const Dashboard = () => {
+  const { profile, isAdmin } = useAuth();
   const [stats, setStats] = useState({
     empreendimentos: 0,
     emAndamento: 0,
     atrasadas: 0,
     horasMes: 0,
+    concluidas: 0,
+    totalDemandas: 0,
   });
-  const [demandas, setDemandas] = useState<any[]>([]);
+  const [urgentes, setUrgentes] = useState<any[]>([]);
+  const [recentes, setRecentes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchData = async () => {
       const now = new Date();
       const mesInicio = format(startOfMonth(now), 'yyyy-MM-dd');
       const mesFim = format(endOfMonth(now), 'yyyy-MM-dd');
 
-      const [empRes, demRes, horasRes] = await Promise.all([
+      const [empRes, demRes, horasRes, statusRes] = await Promise.all([
         supabase.from('esquadro_empreendimentos').select('id', { count: 'exact' }).eq('ativo', true),
         supabase.from('esquadro_demandas').select(`
           *,
           empreendimento:esquadro_empreendimentos(nome),
-          status:esquadro_status(nome),
+          status:esquadro_status(id, nome),
           tipo_projeto:esquadro_tipos_projeto(nome)
         `).order('prioridade').order('prazo'),
-        supabase.from('esquadro_registro_horas').select('horas').gte('data', mesInicio).lte('data', mesFim),
+        supabase.from('esquadro_registro_horas').select('horas, user_id')
+          .gte('data', mesInicio).lte('data', mesFim),
+        supabase.from('esquadro_status').select('id, nome').eq('ativo', true),
       ]);
 
       const allDemandas = demRes.data || [];
+      const allStatus = statusRes.data || [];
+
+      // Find status IDs by normalized name matching
+      const findStatusIds = (keywords: string[]) =>
+        allStatus
+          .filter((s: any) => keywords.some((k) => s.nome.toLowerCase().includes(k)))
+          .map((s: any) => s.id);
+
+      const emAndamentoIds = findStatusIds(['andamento']);
+      const concluidoIds = findStatusIds(['conclu']);
+      const canceladoIds = findStatusIds(['cancel']);
+      const finishedIds = [...concluidoIds, ...canceladoIds];
+
+      const emAndamento = allDemandas.filter((d: any) => emAndamentoIds.includes(d.status_id));
+      const concluidas = allDemandas.filter((d: any) => concluidoIds.includes(d.status_id));
       const atrasadas = allDemandas.filter(
-        (d: any) => d.prazo && new Date(d.prazo) < now && d.status?.nome !== 'concluído' && d.status?.nome !== 'cancelado'
+        (d: any) => d.prazo && new Date(d.prazo) < now && !finishedIds.includes(d.status_id)
       );
-      const horasTotal = (horasRes.data || []).reduce((sum: number, r: any) => sum + (r.horas || 0), 0);
+
+      // Hours this month - filter by user if not admin
+      const horasData = horasRes.data || [];
+      const horasFiltered = isAdmin
+        ? horasData
+        : horasData.filter((h: any) => h.user_id === profile?.id);
+      const horasTotal = horasFiltered.reduce((sum: number, r: any) => sum + (r.horas || 0), 0);
 
       setStats({
         empreendimentos: empRes.count || 0,
-        emAndamento: allDemandas.filter((d: any) => d.status?.nome === 'em andamento').length,
+        emAndamento: emAndamento.length,
         atrasadas: atrasadas.length,
         horasMes: horasTotal,
+        concluidas: concluidas.length,
+        totalDemandas: allDemandas.length,
       });
 
-      // Top 5 mais urgentes (próximas do prazo)
-      const urgentes = allDemandas
-        .filter((d: any) => d.prazo && d.status?.nome !== 'concluído' && d.status?.nome !== 'cancelado')
+      // Top urgentes (closest deadline, not finished)
+      const urgentesList = allDemandas
+        .filter((d: any) => d.prazo && !finishedIds.includes(d.status_id))
         .sort((a: any, b: any) => new Date(a.prazo).getTime() - new Date(b.prazo).getTime())
         .slice(0, 5);
-      setDemandas(urgentes);
+      setUrgentes(urgentesList);
+
+      // Most recently created
+      const recentesList = [...allDemandas]
+        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 5);
+      setRecentes(recentesList);
 
       setLoading(false);
     };
-    fetch();
-  }, []);
+    fetchData();
+  }, [profile?.id, isAdmin]);
 
   const statCards = [
-    { label: 'Empreendimentos Ativos', value: stats.empreendimentos, icon: Building2, color: 'bg-primary' },
-    { label: 'Em Andamento', value: stats.emAndamento, icon: ClipboardList, color: 'bg-accent' },
+    { label: 'Total de Demandas', value: stats.totalDemandas, icon: ClipboardList, color: 'bg-primary' },
+    { label: 'Em Andamento', value: stats.emAndamento, icon: Clock, color: 'bg-accent' },
     { label: 'Atrasadas', value: stats.atrasadas, icon: AlertTriangle, color: 'bg-destructive' },
-    { label: 'Horas no Mês', value: `${stats.horasMes}h`, icon: Clock, color: 'bg-primary' },
+    { label: 'Concluídas', value: stats.concluidas, icon: CheckCircle2, color: 'bg-primary' },
+    { label: 'Empreendimentos', value: stats.empreendimentos, icon: Building2, color: 'bg-accent' },
+    { label: isAdmin ? 'Horas no Mês (Equipe)' : 'Minhas Horas no Mês', value: `${stats.horasMes.toFixed(1)}h`, icon: Users, color: 'bg-primary' },
   ];
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">Visão geral dos projetos</p>
+        <p className="text-muted-foreground text-sm mt-1">
+          {isAdmin ? 'Visão geral dos projetos' : `Olá, ${profile?.nome || 'Bem-vindo(a)'}!`}
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {statCards.map((stat) => (
           <div key={stat.label} className="bg-card border rounded-lg p-5 flex items-start gap-4">
             <div className={`${stat.color} w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0`}>
@@ -83,32 +131,76 @@ const Dashboard = () => {
         ))}
       </div>
 
-      <div className="bg-card border rounded-lg p-5">
-        <h2 className="text-lg font-semibold mb-4">Demandas Urgentes</h2>
-        {loading ? (
-          <p className="text-sm text-muted-foreground">Carregando...</p>
-        ) : demandas.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhuma demanda com prazo próximo.</p>
-        ) : (
-          <div className="space-y-3">
-            {demandas.map((d: any) => (
-              <div key={d.id} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
-                <div>
-                  <p className="font-medium text-sm">{d.empreendimento?.nome}</p>
-                  <p className="text-xs text-muted-foreground">{d.tipo_projeto?.nome} · {d.status?.nome}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Demandas Urgentes */}
+        <div className="bg-card border rounded-lg p-5">
+          <h2 className="text-lg font-semibold mb-4">Demandas com Prazo Próximo</h2>
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Carregando...</p>
+          ) : urgentes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma demanda com prazo definido.</p>
+          ) : (
+            <div className="space-y-3">
+              {urgentes.map((d: any) => {
+                const isLate = d.prazo && new Date(d.prazo) < new Date();
+                return (
+                  <div key={d.id} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate">{d.empreendimento?.nome}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {d.tipo_projeto?.nome} · {d.status?.nome}
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0 ml-3 flex items-center gap-2">
+                      <Badge className={`text-[10px] ${prioridadeColor[d.prioridade] || ''}`}>
+                        {prioridadeLabel[d.prioridade] || '—'}
+                      </Badge>
+                      <div>
+                        <p className="text-sm font-medium">
+                          {format(new Date(d.prazo), 'dd/MM/yyyy')}
+                        </p>
+                        {isLate && (
+                          <p className="text-xs text-destructive font-medium">Atrasada</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Últimas demandas criadas */}
+        <div className="bg-card border rounded-lg p-5">
+          <h2 className="text-lg font-semibold mb-4">Demandas Recentes</h2>
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Carregando...</p>
+          ) : recentes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma demanda registrada.</p>
+          ) : (
+            <div className="space-y-3">
+              {recentes.map((d: any) => (
+                <div key={d.id} className="flex items-center justify-between border-b pb-3 last:border-0 last:pb-0">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm truncate">{d.empreendimento?.nome}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {d.tipo_projeto?.nome} · {d.status?.nome}
+                    </p>
+                  </div>
+                  <div className="text-right flex-shrink-0 ml-3">
+                    <Badge className={`text-[10px] ${prioridadeColor[d.prioridade] || ''}`}>
+                      {prioridadeLabel[d.prioridade] || '—'}
+                    </Badge>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      {format(new Date(d.created_at), 'dd/MM/yyyy')}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium">
-                    {d.prazo ? format(new Date(d.prazo), 'dd/MM/yyyy') : '—'}
-                  </p>
-                  {d.prazo && new Date(d.prazo) < new Date() && (
-                    <p className="text-xs text-destructive font-medium">Atrasada</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
