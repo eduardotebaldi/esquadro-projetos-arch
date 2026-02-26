@@ -45,6 +45,8 @@ type MotivoRow = {
   horas: Record<string, number | ''>;  // date -> hours
 };
 
+const EM_ANDAMENTO_ID = '819a3d87-3884-4223-ac1b-7262434f0828';
+
 const RegistroHoras = () => {
   const { user, profile } = useAuth();
   const [weekStart, setWeekStart] = useState(() =>
@@ -56,9 +58,26 @@ const RegistroHoras = () => {
   const [motivoRows, setMotivoRows] = useState<MotivoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [statusList, setStatusList] = useState<any[]>([]);
+  const [empreendimentos, setEmpreendimentos] = useState<any[]>([]);
+  const [filterStatus, setFilterStatus] = useState<string>(EM_ANDAMENTO_ID);
+  const [filterEmpreendimento, setFilterEmpreendimento] = useState<string>('all');
 
   const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 1 }), [weekStart]);
   const days = useMemo(() => eachDayOfInterval({ start: weekStart, end: weekEnd }), [weekStart, weekEnd]);
+
+  // Fetch filter options once
+  useEffect(() => {
+    const fetchFilters = async () => {
+      const [s, e] = await Promise.all([
+        supabase.from('esquadro_status').select('*').eq('ativo', true).order('ordem'),
+        supabase.from('esquadro_empreendimentos').select('*').eq('ativo', true).order('nome'),
+      ]);
+      setStatusList(s.data || []);
+      setEmpreendimentos(e.data || []);
+    };
+    fetchFilters();
+  }, []);
 
   const fetchData = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -67,11 +86,20 @@ const RegistroHoras = () => {
     const dateFrom = format(weekStart, 'yyyy-MM-dd');
     const dateTo = format(endOfWeek(weekStart, { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
+    let demandasQuery = supabase
+      .from('esquadro_demandas')
+      .select(`id, empreendimento_id, empreendimento:esquadro_empreendimentos(nome), tipo_projeto:esquadro_tipos_projeto(nome), status:esquadro_status(nome), status_id`)
+      .order('prioridade');
+
+    if (filterStatus !== 'all') {
+      demandasQuery = demandasQuery.eq('status_id', filterStatus);
+    }
+    if (filterEmpreendimento !== 'all') {
+      demandasQuery = demandasQuery.eq('empreendimento_id', filterEmpreendimento);
+    }
+
     const [demandasRes, horasRes, motivosRes] = await Promise.all([
-      supabase
-        .from('esquadro_demandas')
-        .select(`id, empreendimento:esquadro_empreendimentos(nome), tipo_projeto:esquadro_tipos_projeto(nome), status:esquadro_status(nome)`)
-        .order('prioridade'),
+      demandasQuery,
       supabase
         .from('esquadro_registro_horas')
         .select('*')
@@ -121,7 +149,7 @@ const RegistroHoras = () => {
     }));
     setMotivoRows(rows);
     setLoading(false);
-  }, [user, weekStart]);
+  }, [user, weekStart, filterStatus, filterEmpreendimento]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -282,7 +310,32 @@ const RegistroHoras = () => {
         </Button>
       </div>
 
-      {/* Timesheet table */}
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os status</SelectItem>
+            {statusList.map((s: any) => (
+              <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterEmpreendimento} onValueChange={setFilterEmpreendimento}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Empreendimento" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos empreendimentos</SelectItem>
+            {empreendimentos.map((e: any) => (
+              <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="border rounded-lg overflow-x-auto bg-card">
         <table className="w-full text-sm">
           <thead>
