@@ -14,9 +14,10 @@ const prioridadeColor: Record<number, string> = {
 interface KanbanViewProps {
   demandas: any[];
   onRefresh: () => void;
+  onDemandaClick?: (demanda: any) => void;
 }
 
-const KanbanView = ({ demandas, onRefresh }: KanbanViewProps) => {
+const KanbanView = ({ demandas, onRefresh, onDemandaClick }: KanbanViewProps) => {
   const [statusList, setStatusList] = useState<Status[]>([]);
   const [draggedId, setDraggedId] = useState<string | null>(null);
 
@@ -89,6 +90,7 @@ const KanbanView = ({ demandas, onRefresh }: KanbanViewProps) => {
                   key={d.id}
                   draggable
                   onDragStart={(e) => handleDragStart(e, d.id)}
+                  onClick={() => onDemandaClick?.(d)}
                   className="bg-card border rounded-md p-3 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-shadow"
                 >
                   <p className="text-sm font-medium truncate">

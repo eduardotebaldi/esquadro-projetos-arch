@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,6 +8,7 @@ import { Plus, LayoutGrid, Table as TableIcon } from 'lucide-react';
 import PautaFilters, { type Filters } from '@/components/pauta/PautaFilters';
 import NovaDemandaDialog from '@/components/pauta/NovaDemandaDialog';
 import KanbanView from '@/components/pauta/KanbanView';
+import DemandaDetailDialog from '@/components/pauta/DemandaDetailDialog';
 import { format } from 'date-fns';
 
 const prioridadeLabel: Record<number, string> = { 1: 'Alta', 2: 'Média', 3: 'Baixa' };
@@ -17,9 +19,12 @@ const prioridadeColor: Record<number, string> = {
 };
 
 const PautaGeral = () => {
+  const { profile, isAdmin } = useAuth();
   const [demandas, setDemandas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedDemanda, setSelectedDemanda] = useState<any | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>({
     search: '',
     status_id: 'all',
@@ -41,6 +46,11 @@ const PautaGeral = () => {
       .order('prioridade')
       .order('created_at', { ascending: false });
 
+    // Filter by arquiteta when not admin
+    if (!isAdmin && profile?.id) {
+      query = query.eq('arquiteta_id', profile.id);
+    }
+
     if (filters.status_id !== 'all') query = query.eq('status_id', filters.status_id);
     if (filters.empreendimento_id !== 'all') query = query.eq('empreendimento_id', filters.empreendimento_id);
     if (filters.tipo_projeto_id !== 'all') query = query.eq('tipo_projeto_id', filters.tipo_projeto_id);
@@ -61,18 +71,25 @@ const PautaGeral = () => {
       setDemandas(result);
     }
     setLoading(false);
-  }, [filters]);
+  }, [filters, isAdmin, profile?.id]);
 
   useEffect(() => {
     fetchDemandas();
   }, [fetchDemandas]);
+
+  const handleDemandaClick = (demanda: any) => {
+    setSelectedDemanda(demanda);
+    setDetailOpen(true);
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Pauta Geral</h1>
-          <p className="text-muted-foreground text-sm mt-1">Gestão de demandas de projetos</p>
+          <p className="text-muted-foreground text-sm mt-1">
+            {isAdmin ? 'Gestão de demandas de projetos' : 'Suas demandas de projetos'}
+          </p>
         </div>
         <Button onClick={() => setDialogOpen(true)}>
           <Plus className="w-4 h-4 mr-1" />
@@ -98,7 +115,7 @@ const PautaGeral = () => {
           {loading ? (
             <div className="text-sm text-muted-foreground py-8 text-center">Carregando...</div>
           ) : (
-            <KanbanView demandas={demandas} onRefresh={fetchDemandas} />
+            <KanbanView demandas={demandas} onRefresh={fetchDemandas} onDemandaClick={handleDemandaClick} />
           )}
         </TabsContent>
 
@@ -127,7 +144,11 @@ const PautaGeral = () => {
                   </tr>
                 )}
                 {demandas.map((d) => (
-                  <tr key={d.id} className="border-t hover:bg-muted/50 transition-colors cursor-pointer">
+                  <tr
+                    key={d.id}
+                    className="border-t hover:bg-muted/50 transition-colors cursor-pointer"
+                    onClick={() => handleDemandaClick(d)}
+                  >
                     <td className="px-4 py-3 font-medium">{d.empreendimento?.nome || '—'}</td>
                     <td className="px-4 py-3">{d.tipo_projeto?.nome || '—'}</td>
                     <td className="px-4 py-3">
@@ -156,6 +177,12 @@ const PautaGeral = () => {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onCreated={fetchDemandas}
+      />
+
+      <DemandaDetailDialog
+        demanda={selectedDemanda}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
       />
     </div>
   );
