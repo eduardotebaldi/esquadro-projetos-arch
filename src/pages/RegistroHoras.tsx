@@ -167,6 +167,18 @@ const RegistroHoras = () => {
       .gte('data', dateFrom)
       .lte('data', dateTo);
 
+    // Add motivos de não-trabalho
+    Object.entries(naoTrabalhadoDia).forEach(([data, motivoId]) => {
+      if (!motivoId) return;
+      upserts.push({
+        demanda_id: null,
+        user_id: user.id,
+        data,
+        horas: 0,
+        motivo_nao_trabalho_id: motivoId,
+      });
+    });
+
     if (upserts.length > 0) {
       const cleanUpserts = upserts.map(({ id, ...rest }) => rest);
       const { error } = await supabase
@@ -320,6 +332,47 @@ const RegistroHoras = () => {
                   </tr>
                 );
               })}
+
+
+            {/* Motivo de não-trabalho row */}
+            {!loading && motivos.length > 0 && (
+              <tr className="border-t border-dashed bg-muted/20">
+                <td className="px-4 py-2 sticky left-0 bg-muted/20 z-10">
+                  <p className="font-medium text-xs text-muted-foreground">Não trabalhou</p>
+                  <p className="text-[10px] text-muted-foreground">Selecione o motivo</p>
+                </td>
+                {days.map((day, i) => {
+                  const dateStr = format(day, 'yyyy-MM-dd');
+                  const isWeekend = isSaturday(day) || isSunday(day);
+                  return (
+                    <td key={i} className={`px-1 py-2 text-center ${isWeekend ? 'bg-muted/30' : ''}`}>
+                      <Select
+                        value={naoTrabalhadoDia[dateStr] || 'none'}
+                        onValueChange={(v) =>
+                          setNaoTrabalhadoDia((prev) => ({
+                            ...prev,
+                            [dateStr]: v === 'none' ? null : v,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="w-16 mx-auto h-8 text-[10px] px-1">
+                          <SelectValue placeholder="—" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">—</SelectItem>
+                          {motivos.map((m: any) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.nome}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </td>
+                  );
+                })}
+                <td className="px-3 py-2"></td>
+              </tr>
+            )}
 
             {/* Totals row */}
             {!loading && demandas.length > 0 && (
