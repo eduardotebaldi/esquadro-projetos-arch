@@ -31,6 +31,7 @@ const PautaGeral = () => {
     empreendimento_id: 'all',
     tipo_projeto_id: 'all',
     prioridade: 'all',
+    arquiteta_id: 'mine',
   });
 
   const fetchDemandas = useCallback(async () => {
@@ -46,9 +47,11 @@ const PautaGeral = () => {
       .order('prioridade')
       .order('created_at', { ascending: false });
 
-    // Filter by arquiteta when not admin
-    if (!isAdmin && profile?.id) {
+    // Filter by arquiteta
+    if (filters.arquiteta_id === 'mine' && profile?.id) {
       query = query.eq('arquiteta_id', profile.id);
+    } else if (filters.arquiteta_id !== 'all' && filters.arquiteta_id !== 'mine') {
+      query = query.eq('arquiteta_id', filters.arquiteta_id);
     }
 
     if (filters.status_id !== 'all') query = query.eq('status_id', filters.status_id);
@@ -71,7 +74,7 @@ const PautaGeral = () => {
       setDemandas(result);
     }
     setLoading(false);
-  }, [filters, isAdmin, profile?.id]);
+  }, [filters, profile?.id]);
 
   useEffect(() => {
     fetchDemandas();
@@ -88,7 +91,7 @@ const PautaGeral = () => {
         <div>
           <h1 className="text-2xl font-bold">Pauta Geral</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {isAdmin ? 'Gestão de demandas de projetos' : 'Suas demandas de projetos'}
+            Gestão de demandas de projetos
           </p>
         </div>
         <Button onClick={() => setDialogOpen(true)}>
