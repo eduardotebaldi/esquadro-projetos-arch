@@ -5,8 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Download, BarChart3, Table as TableIcon } from 'lucide-react';
+import { Download, BarChart3, Table as TableIcon, Check, ChevronsUpDown, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { format, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, subYears, startOfQuarter, endOfQuarter } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -45,7 +48,8 @@ const Historico = () => {
   // Filters
   const [periodo, setPeriodo] = useState<PeriodoPreset>('tudo');
   const [filterArquiteta, setFilterArquiteta] = useState('all');
-  const [filterEmpreendimento, setFilterEmpreendimento] = useState('all');
+  const [filterEmpreendimentos, setFilterEmpreendimentos] = useState<string[]>([]);
+  const [empPopoverOpen, setEmpPopoverOpen] = useState(false);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
@@ -114,8 +118,8 @@ const Historico = () => {
     if (filterArquiteta !== 'all') {
       result = result.filter((d) => d.arquiteta_id === filterArquiteta);
     }
-    if (filterEmpreendimento !== 'all') {
-      result = result.filter((d) => d.empreendimento?.id === filterEmpreendimento);
+    if (filterEmpreendimentos.length > 0) {
+      result = result.filter((d) => filterEmpreendimentos.includes(d.empreendimento?.id));
     }
     if (search) {
       const s = search.toLowerCase();
@@ -126,7 +130,7 @@ const Historico = () => {
       );
     }
     return result;
-  }, [enrichedDemandas, filterArquiteta, filterEmpreendimento, search]);
+  }, [enrichedDemandas, filterArquiteta, filterEmpreendimentos, search]);
 
   // Chart data: costs by empreendimento
   const custosPorEmpreendimento = useMemo(() => {
@@ -243,17 +247,48 @@ const Historico = () => {
             ))}
           </SelectContent>
         </Select>
-        <Select value={filterEmpreendimento} onValueChange={setFilterEmpreendimento}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Empreendimento" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {empreendimentos.map((e: any) => (
-              <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Multi-select empreendimento */}
+        <Popover open={empPopoverOpen} onOpenChange={setEmpPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" role="combobox" className="w-64 justify-between font-normal">
+              {filterEmpreendimentos.length === 0
+                ? 'Empreendimentos'
+                : `${filterEmpreendimentos.length} selecionado(s)`}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-0">
+            <Command>
+              <CommandInput placeholder="Buscar empreendimento..." />
+              <CommandList>
+                <CommandEmpty>Nenhum encontrado.</CommandEmpty>
+                <CommandGroup>
+                  {empreendimentos.map((e: any) => (
+                    <CommandItem
+                      key={e.id}
+                      value={e.nome}
+                      onSelect={() => {
+                        setFilterEmpreendimentos((prev) =>
+                          prev.includes(e.id)
+                            ? prev.filter((id) => id !== e.id)
+                            : [...prev, e.id]
+                        );
+                      }}
+                    >
+                      <Check className={cn('mr-2 h-4 w-4', filterEmpreendimentos.includes(e.id) ? 'opacity-100' : 'opacity-0')} />
+                      {e.nome}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+        {filterEmpreendimentos.length > 0 && (
+          <Button variant="ghost" size="sm" onClick={() => setFilterEmpreendimentos([])}>
+            <X className="w-3 h-3 mr-1" /> Limpar
+          </Button>
+        )}
         <Select value={filterArquiteta} onValueChange={setFilterArquiteta}>
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Responsável" />
@@ -266,6 +301,22 @@ const Historico = () => {
           </SelectContent>
         </Select>
       </div>
+      {filterEmpreendimentos.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {filterEmpreendimentos.map((id) => {
+            const emp = empreendimentos.find((e: any) => e.id === id);
+            return (
+              <Badge key={id} variant="secondary" className="gap-1 text-xs">
+                {emp?.nome || id}
+                <X
+                  className="w-3 h-3 cursor-pointer"
+                  onClick={() => setFilterEmpreendimentos((prev) => prev.filter((x) => x !== id))}
+                />
+              </Badge>
+            );
+          })}
+        </div>
+      )}
 
       {loading ? (
         <p className="text-sm text-muted-foreground text-center py-12">Carregando...</p>
