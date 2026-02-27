@@ -181,17 +181,22 @@ const Historico = () => {
 
   // Export CSV
   const handleExportCSV = () => {
-    const headers = ['Empreendimento', 'Tipo de Projeto', 'Status', 'Prioridade', 'Responsável', 'Prazo', 'Horas Realizadas', 'Custo (R$)'];
-    const rows = filteredDemandas.map((d) => [
-      d.empreendimento?.nome || '',
-      d.tipo_projeto?.nome || '',
-      d.status?.nome || '',
-      prioridadeLabel[d.prioridade] || d.prioridade,
-      d.arquiteta?.nome || d.arquiteta?.email || '',
-      d.prazo ? format(new Date(d.prazo), 'dd/MM/yyyy') : '',
-      d.totalHoras.toFixed(1),
-      d.custo.toFixed(2),
-    ]);
+    const headers = isAdmin
+      ? ['Empreendimento', 'Tipo de Projeto', 'Status', 'Prioridade', 'Responsável', 'Prazo', 'Horas Realizadas', 'Custo (R$)']
+      : ['Empreendimento', 'Tipo de Projeto', 'Status', 'Prioridade', 'Responsável', 'Prazo', 'Horas Realizadas'];
+    const rows = filteredDemandas.map((d) => {
+      const base = [
+        d.empreendimento?.nome || '',
+        d.tipo_projeto?.nome || '',
+        d.status?.nome || '',
+        prioridadeLabel[d.prioridade] || d.prioridade,
+        d.arquiteta?.nome || d.arquiteta?.email || '',
+        d.prazo ? format(new Date(d.prazo), 'dd/MM/yyyy') : '',
+        d.totalHoras.toFixed(1),
+      ];
+      if (isAdmin) base.push(d.custo.toFixed(2));
+      return base;
+    });
     const csvContent = [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -354,72 +359,41 @@ const Historico = () => {
 
             <TabsContent value="graficos">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Custos por empreendimento */}
+                {/* Horas por empreendimento (todos) / Custos por empreendimento (admin) */}
                 {custosPorEmpreendimento.length > 0 && (
                   <div className="bg-card border rounded-lg p-5">
-                    <h2 className="text-lg font-semibold mb-4">Custos por Empreendimento</h2>
+                    <h2 className="text-lg font-semibold mb-4">{isAdmin ? 'Custos por Empreendimento' : 'Horas por Empreendimento'}</h2>
                     <ResponsiveContainer width="100%" height={300}>
                       <BarChart data={custosPorEmpreendimento} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis type="number" tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+                        <XAxis
+                          type="number"
+                          tickFormatter={isAdmin ? (v) => `R$${(v / 1000).toFixed(0)}k` : (v) => `${v}h`}
+                          tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                        />
                         <YAxis type="category" dataKey="nome" width={120} tick={{ fontSize: 11, fill: 'hsl(var(--foreground))' }} />
                         <Tooltip
-                          formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Custo']}
+                          formatter={isAdmin
+                            ? (value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Custo']
+                            : (value: number) => [`${value.toFixed(1)}h`, 'Horas']
+                          }
                           contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
                         />
-                        <Bar dataKey="custo" fill="hsl(226, 100%, 22%)" radius={[0, 4, 4, 0]} />
+                        <Bar dataKey={isAdmin ? 'custo' : 'horas'} fill="hsl(226, 100%, 22%)" radius={[0, 4, 4, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 )}
 
-                {/* Média de horas por tipo */}
-                {mediaHorasPorTipo.length > 0 && (
-                  <div className="bg-card border rounded-lg p-5">
-                    <h2 className="text-lg font-semibold mb-4">Média de Horas por Tipo</h2>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={mediaHorasPorTipo} margin={{ left: 0, right: 20, top: 5, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="nome" tick={{ fontSize: 11, fill: 'hsl(var(--foreground))' }} interval={0} angle={-30} textAnchor="end" height={60} />
-                        <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${v}h`} />
-                        <Tooltip
-                          formatter={(value: number, name: string) => [`${value}h`, name === 'media' ? 'Média' : 'Total']}
-                          contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
-                        />
-                        <Bar dataKey="media" name="Média" fill="hsl(20, 100%, 50%)" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-
-                {/* Horas por arquiteta */}
-                {horasPorArquiteta.length > 0 && (
-                  <div className="bg-card border rounded-lg p-5">
-                    <h2 className="text-lg font-semibold mb-4">Horas por Profissional</h2>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={horasPorArquiteta} margin={{ left: 0, right: 20, top: 5, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis dataKey="nome" tick={{ fontSize: 11, fill: 'hsl(var(--foreground))' }} interval={0} angle={-15} textAnchor="end" height={50} />
-                        <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${v}h`} />
-                        <Tooltip
-                          formatter={(value: number, name: string) => [name === 'horas' ? `${value.toFixed(1)}h` : `R$ ${value.toFixed(2)}`, name === 'horas' ? 'Horas' : 'Custo']}
-                          contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
-                        />
-                        <Bar dataKey="horas" name="Horas" fill="hsl(226, 60%, 40%)" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                )}
-
-                {/* Distribuição de custos (Pie) */}
+                {/* Distribuição por empreendimento (Pie) */}
                 {custosPorEmpreendimento.length > 0 && (
                   <div className="bg-card border rounded-lg p-5">
-                    <h2 className="text-lg font-semibold mb-4">Distribuição de Custos</h2>
+                    <h2 className="text-lg font-semibold mb-4">{isAdmin ? 'Distribuição de Custos' : 'Distribuição de Horas'}</h2>
                     <ResponsiveContainer width="100%" height={300}>
                       <PieChart>
                         <Pie
                           data={custosPorEmpreendimento}
-                          dataKey="custo"
+                          dataKey={isAdmin ? 'custo' : 'horas'}
                           nameKey="nome"
                           cx="50%"
                           cy="50%"
@@ -432,7 +406,10 @@ const Historico = () => {
                           ))}
                         </Pie>
                         <Tooltip
-                          formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Custo']}
+                          formatter={isAdmin
+                            ? (value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Custo']
+                            : (value: number) => [`${value.toFixed(1)}h`, 'Horas']
+                          }
                           contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '12px' }}
                         />
                       </PieChart>
