@@ -11,6 +11,7 @@ import PautaGeral from "@/pages/PautaGeral";
 import Comentarios from "@/pages/Comentarios";
 import Historico from "@/pages/Historico";
 import RegistroHoras from "@/pages/RegistroHoras";
+import RelatorioHoras from "@/pages/RelatorioHoras";
 import CustosIncorridos from "@/pages/CustosIncorridos";
 import Configuracoes from "@/pages/Configuracoes";
 import NotFound from "@/pages/NotFound";
@@ -70,6 +71,7 @@ const App = () => (
               <Route path="/comentarios" element={<Comentarios />} />
               <Route path="/historico" element={<Historico />} />
               <Route path="/horas" element={<RegistroHoras />} />
+              <Route path="/relatorio-horas" element={<RelatorioHoras />} />
               <Route path="/custos" element={<AdminRoute><CustosIncorridos /></AdminRoute>} />
               <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
             </Route>
