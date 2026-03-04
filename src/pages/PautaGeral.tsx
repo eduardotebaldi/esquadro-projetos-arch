@@ -115,7 +115,7 @@ const PautaGeral = () => {
         </TabsList>
 
         <TabsContent value="kanban">
-          {loading ? (
+          {loading && demandas.length === 0 ? (
             <div className="text-sm text-muted-foreground py-8 text-center">Carregando...</div>
           ) : (
             <KanbanView demandas={demandas} onRefresh={fetchDemandas} onDemandaClick={handleDemandaClick} />

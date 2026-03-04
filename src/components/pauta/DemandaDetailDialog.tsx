@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Send, Pencil, Check, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -37,6 +38,8 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
   const [editingInstrucoes, setEditingInstrucoes] = useState(false);
   const [instrucoes, setInstrucoes] = useState('');
   const [savingInstrucoes, setSavingInstrucoes] = useState(false);
+  const [editingHoras, setEditingHoras] = useState(false);
+  const [horasEstimadas, setHorasEstimadas] = useState('');
 
   useEffect(() => {
     if (!demanda || !open) return;
@@ -121,6 +124,22 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
     setSavingInstrucoes(false);
   };
 
+  const handleSaveHorasEstimadas = async () => {
+    if (!demanda) return;
+    const value = horasEstimadas === '' ? null : Number(horasEstimadas);
+    const { error } = await supabase
+      .from('esquadro_demandas')
+      .update({ horas_estimadas: value })
+      .eq('id', demanda.id);
+    if (error) {
+      toast({ title: 'Erro ao salvar horas', description: error.message, variant: 'destructive' });
+    } else {
+      demanda.horas_estimadas = value;
+      setEditingHoras(false);
+      onRefresh?.();
+    }
+  };
+
   if (!demanda) return null;
 
   return (
@@ -152,8 +171,30 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
             {demanda.prazo && (
               <> · Prazo: {format(new Date(demanda.prazo), 'dd/MM/yyyy')}</>
             )}
-            {demanda.horas_estimadas != null && (
-              <> · {demanda.horas_estimadas}h estimadas</>
+            {editingHoras ? (
+              <span className="inline-flex items-center gap-1 ml-1">
+                · <Input
+                  type="number"
+                  step="0.5"
+                  value={horasEstimadas}
+                  onChange={(e) => setHorasEstimadas(e.target.value)}
+                  className="w-20 h-6 text-xs inline"
+                />
+                h
+                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleSaveHorasEstimadas}>
+                  <Check className="w-3 h-3" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setEditingHoras(false)}>
+                  <X className="w-3 h-3" />
+                </Button>
+              </span>
+            ) : (
+              <span
+                className="cursor-pointer hover:underline ml-1"
+                onClick={() => { setHorasEstimadas(demanda.horas_estimadas != null ? String(demanda.horas_estimadas) : ''); setEditingHoras(true); }}
+              >
+                · {demanda.horas_estimadas != null ? `${demanda.horas_estimadas}h estimadas` : 'Definir horas'}
+              </span>
             )}
           </DialogDescription>
         </DialogHeader>

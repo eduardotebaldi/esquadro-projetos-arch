@@ -45,9 +45,12 @@ const Historico = () => {
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [empreendimentos, setEmpreendimentos] = useState<any[]>([]);
 
+  const [statusList, setStatusList] = useState<any[]>([]);
+
   // Filters
   const [periodo, setPeriodo] = useState<PeriodoPreset>('tudo');
   const [filterArquiteta, setFilterArquiteta] = useState('all');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [filterEmpreendimentos, setFilterEmpreendimentos] = useState<string[]>([]);
   const [empPopoverOpen, setEmpPopoverOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -70,6 +73,14 @@ const Historico = () => {
       setHoras(horasRes.data || []);
       setUsuarios(usrRes.data || []);
       setEmpreendimentos(empRes.data || []);
+
+      // Extract unique statuses from demandas
+      const statusMap = new Map();
+      (demRes.data || []).forEach((d: any) => {
+        if (d.status?.id) statusMap.set(d.status.id, d.status.nome);
+      });
+      setStatusList(Array.from(statusMap.entries()).map(([id, nome]) => ({ id, nome })).sort((a: any, b: any) => a.nome.localeCompare(b.nome)));
+
       setLoading(false);
     };
     fetchData();
@@ -118,6 +129,9 @@ const Historico = () => {
     if (filterArquiteta !== 'all') {
       result = result.filter((d) => d.arquiteta_id === filterArquiteta);
     }
+    if (filterStatus !== 'all') {
+      result = result.filter((d) => d.status?.id === filterStatus);
+    }
     if (filterEmpreendimentos.length > 0) {
       result = result.filter((d) => filterEmpreendimentos.includes(d.empreendimento?.id));
     }
@@ -130,7 +144,7 @@ const Historico = () => {
       );
     }
     return result;
-  }, [enrichedDemandas, filterArquiteta, filterEmpreendimentos, search]);
+  }, [enrichedDemandas, filterArquiteta, filterStatus, filterEmpreendimentos, search]);
 
   // Chart data: costs by empreendimento
   const custosPorEmpreendimento = useMemo(() => {
@@ -302,6 +316,17 @@ const Historico = () => {
             <SelectItem value="all">Todas</SelectItem>
             {usuarios.map((u: any) => (
               <SelectItem key={u.id} value={u.id}>{u.nome || u.email}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterStatus} onValueChange={setFilterStatus}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os status</SelectItem>
+            {statusList.map((s: any) => (
+              <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
             ))}
           </SelectContent>
         </Select>
