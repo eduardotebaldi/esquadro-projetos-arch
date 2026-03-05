@@ -6,6 +6,7 @@ import {
   MessageSquare,
   BarChart3,
   Clock,
+  FileBarChart,
   DollarSign,
   Settings,
   LogOut,
@@ -22,7 +23,7 @@ const navItems = [
   { to: '/comentarios', icon: MessageSquare, label: 'Comentários' },
   { to: '/historico', icon: BarChart3, label: 'Histórico' },
   { to: '/horas', icon: Clock, label: 'Registro de Horas' },
-  { to: '/relatorio-horas', icon: Clock, label: 'Relatório de Horas' },
+  { to: '/relatorio-horas', icon: FileBarChart, label: 'Relatório de Horas' },
 ];
 
 const adminItems = [
