@@ -208,6 +208,7 @@ const ConfigUsuarios = () => {
                       <SelectItem value="admin">Admin</SelectItem>
                       <SelectItem value="arquiteta">Arquiteta</SelectItem>
                       <SelectItem value="comum">Comum</SelectItem>
+                      <SelectItem value="desativado">Desativado</SelectItem>
                     </SelectContent>
                   </Select>
                 </td>
@@ -273,11 +274,12 @@ const ConfigUsuarios = () => {
                 <Label>Perfil</Label>
                 <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="arquiteta">Arquiteta</SelectItem>
-                    <SelectItem value="comum">Comum</SelectItem>
-                  </SelectContent>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="arquiteta">Arquiteta</SelectItem>
+                      <SelectItem value="comum">Comum</SelectItem>
+                      <SelectItem value="desativado">Desativado</SelectItem>
+                    </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
