@@ -1,9 +1,9 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   format,
   startOfWeek,
@@ -27,10 +27,12 @@ const DAY_NAMES_SHORT = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 const RelatorioHoras = () => {
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [registros, setRegistros] = useState<any[]>([]);
+  const [demandas, setDemandas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterUsuario, setFilterUsuario] = useState('all');
   const [visualizacao, setVisualizacao] = useState<Visualizacao>('semanal');
   const [refDate, setRefDate] = useState(new Date());
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
 
   const periodStart = useMemo(() =>
     visualizacao === 'semanal'
@@ -68,8 +70,17 @@ const RelatorioHoras = () => {
       query = query.eq('user_id', filterUsuario);
     }
 
-    const { data } = await query;
-    setRegistros(data || []);
+    const [regRes, demRes] = await Promise.all([
+      query,
+      supabase.from('esquadro_demandas').select(`
+        id,
+        empreendimento:esquadro_empreendimentos(nome),
+        tipo_projeto:esquadro_tipos_projeto(nome)
+      `),
+    ]);
+
+    setRegistros(regRes.data || []);
+    setDemandas(demRes.data || []);
     setLoading(false);
   }, [periodStart, periodEnd, filterUsuario]);
 
@@ -83,31 +94,66 @@ const RelatorioHoras = () => {
     );
   };
 
-  // Group by user
-  const usersToShow = useMemo(() => {
+  const toggleUser = (userId: string) => {
+    setExpandedUsers(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
+
+  const expandAll = () => setExpandedUsers(new Set(usersData.map(u => u.id)));
+  const collapseAll = () => setExpandedUsers(new Set());
+
+  // Build grouped data: user -> demandas with hours
+  const usersData = useMemo(() => {
     const userIds = filterUsuario !== 'all'
       ? [filterUsuario]
       : [...new Set(registros.map(r => r.user_id))];
-    return userIds.map(id => {
-      const usr = usuarios.find(u => u.id === id);
-      return { id, nome: usr?.nome || usr?.email || id };
-    }).sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [registros, filterUsuario, usuarios]);
 
-  const getUserDayTotal = (userId: string, dateStr: string) =>
-    registros
-      .filter(r => r.user_id === userId && r.data === dateStr)
-      .reduce((sum, r) => sum + (r.horas || 0), 0);
+    return userIds.map(userId => {
+      const usr = usuarios.find(u => u.id === userId);
+      const userRegs = registros.filter(r => r.user_id === userId);
 
-  const getUserTotal = (userId: string) =>
-    registros
-      .filter(r => r.user_id === userId)
-      .reduce((sum, r) => sum + (r.horas || 0), 0);
+      // Get unique demanda_ids with hours
+      const demandaIds = [...new Set(userRegs.filter(r => r.demanda_id).map(r => r.demanda_id))];
+
+      const userDemandas = demandaIds.map(dId => {
+        const dem = demandas.find(d => d.id === dId);
+        const label = dem
+          ? `${dem.empreendimento?.nome || '—'} · ${dem.tipo_projeto?.nome || '—'}`
+          : 'Demanda desconhecida';
+
+        const horasPorDia: Record<string, number> = {};
+        userRegs.filter(r => r.demanda_id === dId).forEach(r => {
+          horasPorDia[r.data] = (horasPorDia[r.data] || 0) + (r.horas || 0);
+        });
+
+        const total = Object.values(horasPorDia).reduce((s, h) => s + h, 0);
+        return { demandaId: dId, label, horasPorDia, total };
+      }).sort((a, b) => b.total - a.total);
+
+      // Total per day for this user
+      const userTotalPorDia: Record<string, number> = {};
+      userRegs.forEach(r => {
+        const d = r.data;
+        userTotalPorDia[d] = (userTotalPorDia[d] || 0) + (r.horas || 0);
+      });
+      const userTotal = Object.values(userTotalPorDia).reduce((s, h) => s + h, 0);
+
+      return {
+        id: userId,
+        nome: usr?.nome || usr?.email || userId,
+        demandas: userDemandas,
+        totalPorDia: userTotalPorDia,
+        total: userTotal,
+      };
+    }).filter(u => u.total > 0).sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [registros, filterUsuario, usuarios, demandas]);
 
   const getDayTotal = (dateStr: string) =>
-    registros
-      .filter(r => r.data === dateStr)
-      .reduce((sum, r) => sum + (r.horas || 0), 0);
+    registros.filter(r => r.data === dateStr).reduce((sum, r) => sum + (r.horas || 0), 0);
 
   const grandTotal = registros.reduce((sum, r) => sum + (r.horas || 0), 0);
 
@@ -115,11 +161,13 @@ const RelatorioHoras = () => {
     ? `${format(periodStart, "dd 'de' MMMM", { locale: ptBR })} — ${format(periodEnd, "dd 'de' MMMM yyyy", { locale: ptBR })}`
     : format(periodStart, "MMMM 'de' yyyy", { locale: ptBR });
 
+  const allExpanded = usersData.length > 0 && expandedUsers.size === usersData.length;
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-bold">Relatório de Horas</h1>
-        <p className="text-muted-foreground text-sm mt-1">Visualização de horas trabalhadas</p>
+        <p className="text-muted-foreground text-sm mt-1">Horas por profissional e projeto</p>
       </div>
 
       {/* Filters */}
@@ -145,6 +193,12 @@ const RelatorioHoras = () => {
             ))}
           </SelectContent>
         </Select>
+
+        {usersData.length > 1 && (
+          <Button variant="outline" size="sm" className="text-xs" onClick={allExpanded ? collapseAll : expandAll}>
+            {allExpanded ? 'Recolher todos' : 'Expandir todos'}
+          </Button>
+        )}
       </div>
 
       {/* Period navigation */}
@@ -165,8 +219,8 @@ const RelatorioHoras = () => {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-muted">
-              <th className="text-left px-4 py-3 font-medium text-muted-foreground min-w-[180px] sticky left-0 bg-muted z-10">
-                Usuário
+              <th className="text-left px-4 py-3 font-medium text-muted-foreground min-w-[240px] sticky left-0 bg-muted z-10">
+                Profissional / Projeto
               </th>
               {days.map((day, i) => {
                 const isWeekend = isSaturday(day) || isSunday(day);
@@ -187,7 +241,7 @@ const RelatorioHoras = () => {
                   Carregando...
                 </td>
               </tr>
-            ) : usersToShow.length === 0 ? (
+            ) : usersData.length === 0 ? (
               <tr>
                 <td colSpan={days.length + 2} className="px-4 py-8 text-center text-muted-foreground">
                   Nenhum registro encontrado.
@@ -195,39 +249,77 @@ const RelatorioHoras = () => {
               </tr>
             ) : (
               <>
-                {usersToShow.map(usr => {
-                  const total = getUserTotal(usr.id);
+                {usersData.map(usr => {
+                  const isExpanded = expandedUsers.has(usr.id);
                   return (
-                    <tr key={usr.id} className="border-t">
-                      <td className="px-4 py-2 font-medium text-xs sticky left-0 bg-card z-10 truncate max-w-[180px]">
-                        {usr.nome}
-                      </td>
-                      {days.map((day, i) => {
-                        const dateStr = format(day, 'yyyy-MM-dd');
-                        const val = getUserDayTotal(usr.id, dateStr);
-                        const isWeekend = isSaturday(day) || isSunday(day);
-                        return (
-                          <td key={i} className={`px-1 py-2 text-center text-xs tabular-nums ${isWeekend ? 'bg-muted/30' : ''}`}>
-                            {val > 0 ? `${val}` : <span className="text-muted-foreground/30">—</span>}
+                    <React.Fragment key={usr.id}>
+                      {/* User summary row */}
+                      <tr
+                        className="border-t bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => toggleUser(usr.id)}
+                      >
+                        <td className="px-4 py-2.5 font-medium text-xs sticky left-0 bg-muted/30 z-10">
+                          <div className="flex items-center gap-1.5">
+                            {isExpanded
+                              ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                              : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                            }
+                            <span>{usr.nome}</span>
+                            <span className="text-muted-foreground font-normal ml-1">
+                              ({usr.demandas.length} {usr.demandas.length === 1 ? 'projeto' : 'projetos'})
+                            </span>
+                          </div>
+                        </td>
+                        {days.map((day, i) => {
+                          const dateStr = format(day, 'yyyy-MM-dd');
+                          const val = usr.totalPorDia[dateStr] || 0;
+                          const isWeekend = isSaturday(day) || isSunday(day);
+                          return (
+                            <td key={i} className={cn('px-1 py-2.5 text-center text-xs tabular-nums font-medium', isWeekend && 'bg-muted/20')}>
+                              {val > 0 ? val : <span className="text-muted-foreground/30">—</span>}
+                            </td>
+                          );
+                        })}
+                        <td className="px-3 py-2.5 text-center font-bold text-xs tabular-nums">
+                          {usr.total > 0 ? `${usr.total}h` : '—'}
+                        </td>
+                      </tr>
+
+                      {/* Expanded: project rows */}
+                      {isExpanded && usr.demandas.map(dem => (
+                        <tr key={dem.demandaId} className="border-t border-dashed">
+                          <td className="pl-10 pr-4 py-1.5 text-xs text-muted-foreground sticky left-0 bg-card z-10 truncate max-w-[240px]">
+                            {dem.label}
                           </td>
-                        );
-                      })}
-                      <td className="px-3 py-2 text-center font-medium text-xs tabular-nums">
-                        {total > 0 ? `${total}h` : '—'}
-                      </td>
-                    </tr>
+                          {days.map((day, i) => {
+                            const dateStr = format(day, 'yyyy-MM-dd');
+                            const val = dem.horasPorDia[dateStr] || 0;
+                            const isWeekend = isSaturday(day) || isSunday(day);
+                            return (
+                              <td key={i} className={cn('px-1 py-1.5 text-center text-[11px] tabular-nums', isWeekend && 'bg-muted/20')}>
+                                {val > 0 ? val : <span className="text-muted-foreground/20">—</span>}
+                              </td>
+                            );
+                          })}
+                          <td className="px-3 py-1.5 text-center text-xs tabular-nums text-muted-foreground">
+                            {dem.total > 0 ? `${dem.total}h` : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
                   );
                 })}
-                {/* Totals row */}
-                {usersToShow.length > 1 && (
+
+                {/* Grand totals */}
+                {usersData.length > 1 && (
                   <tr className="border-t-2 border-primary/20 bg-muted/50 font-medium">
-                    <td className="px-4 py-3 sticky left-0 bg-muted/50 z-10 text-xs">Total</td>
+                    <td className="px-4 py-3 sticky left-0 bg-muted/50 z-10 text-xs">Total Geral</td>
                     {days.map((day, i) => {
                       const dateStr = format(day, 'yyyy-MM-dd');
                       const val = getDayTotal(dateStr);
                       return (
                         <td key={i} className="px-1 py-3 text-center text-xs tabular-nums">
-                          {val > 0 ? `${val}` : '—'}
+                          {val > 0 ? val : '—'}
                         </td>
                       );
                     })}
