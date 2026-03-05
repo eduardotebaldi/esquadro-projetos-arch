@@ -6,7 +6,7 @@ interface UserProfile {
   id: string;
   email: string;
   nome: string | null;
-  role: 'admin' | 'arquiteta';
+  role: 'admin' | 'arquiteta' | 'comum';
   ativo: boolean;
   custo_hora: number | null;
 }

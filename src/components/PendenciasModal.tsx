@@ -1,0 +1,101 @@
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { AlertTriangle } from 'lucide-react';
+import { format, eachDayOfInterval, getDay, startOfDay, subDays, isBefore } from 'date-fns';
+
+const HORAS_PADRAO: Record<number, number> = {
+  1: 8.75, 2: 8.5, 3: 8.5, 4: 8.5, 5: 8.5, 6: 0, 0: 0,
+};
+const ALOCACAO_INICIO = new Date('2026-02-23');
+
+const PendenciasModal = () => {
+  const { profile } = useAuth();
+  const location = useLocation();
+  const [open, setOpen] = useState(false);
+  const [gaps, setGaps] = useState<{ data: string; esperado: number; alocado: number }[]>([]);
+  const [totalFaltante, setTotalFaltante] = useState(0);
+
+  useEffect(() => {
+    if (profile?.role !== 'arquiteta') return;
+
+    const checkPendencias = async () => {
+      const ontem = startOfDay(subDays(new Date(), 1));
+      const inicioAlocacao = startOfDay(ALOCACAO_INICIO);
+      if (isBefore(ontem, inicioAlocacao)) return;
+
+      const { data: allHoras } = await supabase
+        .from('esquadro_registro_horas')
+        .select('data, horas')
+        .eq('user_id', profile.id)
+        .gte('data', format(inicioAlocacao, 'yyyy-MM-dd'))
+        .lte('data', format(ontem, 'yyyy-MM-dd'));
+
+      const horasMap: Record<string, number> = {};
+      (allHoras || []).forEach((r: any) => {
+        horasMap[r.data] = (horasMap[r.data] || 0) + (r.horas || 0);
+      });
+
+      const diasCheck = eachDayOfInterval({ start: inicioAlocacao, end: ontem });
+      const pendGaps: typeof gaps = [];
+
+      diasCheck.forEach((dia) => {
+        const esperado = HORAS_PADRAO[getDay(dia)] || 0;
+        if (esperado === 0) return;
+        const dateStr = format(dia, 'yyyy-MM-dd');
+        const alocado = horasMap[dateStr] || 0;
+        if (alocado < esperado) {
+          pendGaps.push({ data: dateStr, esperado, alocado });
+        }
+      });
+
+      if (pendGaps.length > 0) {
+        setGaps(pendGaps);
+        setTotalFaltante(pendGaps.reduce((s, g) => s + (g.esperado - g.alocado), 0));
+        setOpen(true);
+      } else {
+        setOpen(false);
+      }
+    };
+
+    checkPendencias();
+  }, [location.pathname, profile?.id, profile?.role]);
+
+  if (profile?.role !== 'arquiteta' || gaps.length === 0) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-destructive">
+            <AlertTriangle className="w-5 h-5" />
+            Pendências de Alocação de Horas
+          </DialogTitle>
+          <DialogDescription>
+            Você possui <strong className="text-destructive">{totalFaltante.toFixed(1)}h</strong> não alocadas em <strong>{gaps.length}</strong> {gaps.length === 1 ? 'dia' : 'dias'}. Por favor, regularize seu registro de horas.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-[300px] overflow-y-auto space-y-1 mt-2">
+          {gaps.map((g) => (
+            <div key={g.data} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
+              <span>{format(new Date(g.data + 'T12:00:00'), 'dd/MM/yyyy')}</span>
+              <span className="text-destructive font-medium">
+                {g.alocado}h / {g.esperado}h
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-end mt-2">
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Entendi
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default PendenciasModal;

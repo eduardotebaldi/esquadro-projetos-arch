@@ -187,8 +187,8 @@ const ConfigUsuarios = () => {
                 <td className="px-4 py-3 font-medium">{u.nome || '—'}</td>
                 <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
                 <td className="px-4 py-3 text-center">
-                  <Badge variant={u.role === 'admin' ? 'default' : 'secondary'}>
-                    {u.role === 'admin' ? 'Admin' : 'Arquiteta'}
+                  <Badge variant={u.role === 'admin' ? 'default' : u.role === 'arquiteta' ? 'secondary' : 'outline'}>
+                    {u.role === 'admin' ? 'Admin' : u.role === 'arquiteta' ? 'Arquiteta' : 'Comum'}
                   </Badge>
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">
@@ -256,6 +256,7 @@ const ConfigUsuarios = () => {
                   <SelectContent>
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="arquiteta">Arquiteta</SelectItem>
+                    <SelectItem value="comum">Comum</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
