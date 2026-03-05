@@ -86,7 +86,7 @@ const Comentarios = () => {
     const { error } = await supabase.from('esquadro_comentarios').insert({
       demanda_id: novoDemandaId,
       user_id: user?.id,
-      texto: novoTexto.trim(),
+      conteudo: novoTexto.trim(),
     });
     if (error) {
       toast({ title: 'Erro ao enviar', description: error.message, variant: 'destructive' });
@@ -189,7 +189,7 @@ const Comentarios = () => {
                 {format(new Date(c.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
               </span>
             </div>
-            <p className="text-sm whitespace-pre-wrap">{c.texto}</p>
+            <p className="text-sm whitespace-pre-wrap">{c.conteudo}</p>
           </div>
         ))}
       </div>
