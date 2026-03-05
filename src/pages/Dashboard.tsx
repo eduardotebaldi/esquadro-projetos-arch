@@ -187,6 +187,24 @@ const Dashboard = () => {
         </p>
       </div>
 
+      {/* Pendências de alocação de horas */}
+      {pendencias.length > 0 && (
+        <Link to="/pendencias-horas" className="block">
+          <div className="bg-card border border-destructive/20 rounded-lg p-5 hover:bg-muted/50 transition-colors">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+                <h2 className="text-lg font-semibold">Pendências de Alocação de Horas</h2>
+              </div>
+              <Badge variant="destructive">{pendencias.length} {pendencias.length === 1 ? 'profissional' : 'profissionais'}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              {pendencias.reduce((s: number, p: any) => s + p.horasFaltantes, 0).toFixed(1)}h faltantes no total. Clique para ver detalhes.
+            </p>
+          </div>
+        </Link>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {statCards.map((stat) => (
           <div key={stat.label} className="bg-card border rounded-lg p-5 flex items-start gap-4">
@@ -273,23 +291,6 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Pendências de alocação de horas */}
-      {pendencias.length > 0 && (
-        <Link to="/pendencias-horas" className="block">
-          <div className="bg-card border border-destructive/20 rounded-lg p-5 hover:bg-muted/50 transition-colors">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-destructive" />
-                <h2 className="text-lg font-semibold">Pendências de Alocação de Horas</h2>
-              </div>
-              <Badge variant="destructive">{pendencias.length} {pendencias.length === 1 ? 'profissional' : 'profissionais'}</Badge>
-            </div>
-            <p className="text-sm text-muted-foreground mt-2">
-              {pendencias.reduce((s: number, p: any) => s + p.horasFaltantes, 0).toFixed(1)}h faltantes no total. Clique para ver detalhes.
-            </p>
-          </div>
-        </Link>
-      )}
     </div>
   );
 };
