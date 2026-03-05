@@ -54,6 +54,7 @@ const Historico = () => {
   const [filterEmpreendimentos, setFilterEmpreendimentos] = useState<string[]>([]);
   const [empPopoverOpen, setEmpPopoverOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [filterImpugnacao, setFilterImpugnacao] = useState('all');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -63,7 +64,8 @@ const Historico = () => {
           id, horas_estimadas, prioridade, prazo, data_solicitacao, arquiteta_id, instrucoes,
           empreendimento:esquadro_empreendimentos(id, nome),
           status:esquadro_status(id, nome),
-          tipo_projeto:esquadro_tipos_projeto(id, nome)
+          tipo_projeto:esquadro_tipos_projeto(id, nome),
+          impugnacoes:esquadro_impugnacoes(id)
         `),
         supabase.from('esquadro_registro_horas').select('demanda_id, user_id, horas, data'),
         supabase.from('esquadro_profiles').select('id, nome, email, custo_hora').eq('ativo', true).order('nome'),
@@ -143,8 +145,13 @@ const Historico = () => {
         d.instrucoes?.toLowerCase().includes(s)
       );
     }
+    if (filterImpugnacao === 'impugnados') {
+      result = result.filter((d) => d.impugnacoes?.length > 0);
+    } else if (filterImpugnacao === 'nao_impugnados') {
+      result = result.filter((d) => !d.impugnacoes || d.impugnacoes.length === 0);
+    }
     return result;
-  }, [enrichedDemandas, filterArquiteta, filterStatus, filterEmpreendimentos, search]);
+  }, [enrichedDemandas, filterArquiteta, filterStatus, filterEmpreendimentos, search, filterImpugnacao]);
 
   // Chart data: costs by empreendimento
   const custosPorEmpreendimento = useMemo(() => {
@@ -328,6 +335,16 @@ const Historico = () => {
             {statusList.map((s: any) => (
               <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterImpugnacao} onValueChange={setFilterImpugnacao}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Impugnações" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="impugnados">Impugnados</SelectItem>
+            <SelectItem value="nao_impugnados">Não impugnados</SelectItem>
           </SelectContent>
         </Select>
       </div>

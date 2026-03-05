@@ -42,7 +42,8 @@ const PautaGeral = () => {
         *,
         empreendimento:esquadro_empreendimentos(id, nome),
         status:esquadro_status(id, nome),
-        tipo_projeto:esquadro_tipos_projeto(id, nome)
+        tipo_projeto:esquadro_tipos_projeto(id, nome),
+        impugnacoes:esquadro_impugnacoes(id)
       `)
       .order('prioridade')
       .order('created_at', { ascending: false });
