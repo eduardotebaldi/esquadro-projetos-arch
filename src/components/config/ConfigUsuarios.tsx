@@ -149,14 +149,27 @@ const ConfigUsuarios = () => {
   };
 
   const changeRole = async (id: string, newRole: string) => {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('esquadro_profiles')
       .update({ role: newRole })
-      .eq('id', id);
+      .eq('id', id)
+      .select('id, role')
+      .maybeSingle();
+
     if (error) {
       toast({ title: 'Erro ao alterar perfil', description: error.message, variant: 'destructive' });
       return;
     }
+
+    if (!data || data.role !== newRole) {
+      toast({
+        title: 'Alteração não permitida',
+        description: 'Sua política de acesso (RLS) não permitiu atualizar o perfil.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     toast({ title: 'Perfil atualizado' });
     fetchUsuarios();
   };
