@@ -148,6 +148,19 @@ const ConfigUsuarios = () => {
     fetchUsuarios();
   };
 
+  const changeRole = async (id: string, newRole: string) => {
+    const { error } = await supabase
+      .from('esquadro_profiles')
+      .update({ role: newRole })
+      .eq('id', id);
+    if (error) {
+      toast({ title: 'Erro ao alterar perfil', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Perfil atualizado' });
+    fetchUsuarios();
+  };
+
   if (loading) {
     return <div className="text-sm text-muted-foreground p-4">Carregando...</div>;
   }
@@ -187,9 +200,16 @@ const ConfigUsuarios = () => {
                 <td className="px-4 py-3 font-medium">{u.nome || '—'}</td>
                 <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
                 <td className="px-4 py-3 text-center">
-                  <Badge variant={u.role === 'admin' ? 'default' : u.role === 'arquiteta' ? 'secondary' : 'outline'}>
-                    {u.role === 'admin' ? 'Admin' : u.role === 'arquiteta' ? 'Arquiteta' : 'Comum'}
-                  </Badge>
+                  <Select value={u.role} onValueChange={(v) => changeRole(u.id, v)}>
+                    <SelectTrigger className="h-7 w-28 mx-auto text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="arquiteta">Arquiteta</SelectItem>
+                      <SelectItem value="comum">Comum</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">
                   {u.custo_hora != null ? `R$ ${u.custo_hora.toFixed(2)}` : '—'}
