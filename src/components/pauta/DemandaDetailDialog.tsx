@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Send, Pencil, Check, X } from 'lucide-react';
+import { Send, Pencil, Check, X, AlertTriangle, Plus, Trash2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -40,10 +40,16 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
   const [savingInstrucoes, setSavingInstrucoes] = useState(false);
   const [editingHoras, setEditingHoras] = useState(false);
   const [horasEstimadas, setHorasEstimadas] = useState('');
+  const [impugnacoes, setImpugnacoes] = useState<any[]>([]);
+  const [novaImpugnacao, setNovaImpugnacao] = useState('');
+  const [novaImpugnacaoData, setNovaImpugnacaoData] = useState('');
+  const [addingImpugnacao, setAddingImpugnacao] = useState(false);
+  const [showImpugnacaoForm, setShowImpugnacaoForm] = useState(false);
 
   useEffect(() => {
     if (!demanda || !open) return;
     fetchComentarios();
+    fetchImpugnacoes();
   }, [demanda, open]);
 
   const fetchComentarios = async () => {
@@ -72,6 +78,46 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
     }
     setComentarios(comments);
     setLoadingComments(false);
+  };
+
+  const fetchImpugnacoes = async () => {
+    if (!demanda) return;
+    const { data } = await supabase
+      .from('esquadro_impugnacoes')
+      .select('*')
+      .eq('demanda_id', demanda.id)
+      .order('data', { ascending: false });
+    setImpugnacoes(data || []);
+  };
+
+  const handleAddImpugnacao = async () => {
+    if (!demanda || !novaImpugnacao.trim()) return;
+    setAddingImpugnacao(true);
+    const { error } = await supabase.from('esquadro_impugnacoes').insert({
+      demanda_id: demanda.id,
+      descricao: novaImpugnacao.trim(),
+      data: novaImpugnacaoData || new Date().toISOString().split('T')[0],
+    });
+    if (error) {
+      toast({ title: 'Erro ao registrar impugnação', description: error.message, variant: 'destructive' });
+    } else {
+      setNovaImpugnacao('');
+      setNovaImpugnacaoData('');
+      setShowImpugnacaoForm(false);
+      fetchImpugnacoes();
+      onRefresh?.();
+    }
+    setAddingImpugnacao(false);
+  };
+
+  const handleDeleteImpugnacao = async (id: string) => {
+    const { error } = await supabase.from('esquadro_impugnacoes').delete().eq('id', id);
+    if (error) {
+      toast({ title: 'Erro ao excluir', description: error.message, variant: 'destructive' });
+    } else {
+      fetchImpugnacoes();
+      onRefresh?.();
+    }
   };
 
   const handleSend = async () => {
@@ -235,6 +281,76 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
             ) : (
               <div className="bg-muted rounded-md p-3 text-sm whitespace-pre-wrap min-h-[60px]">
                 {demanda.instrucoes || 'Nenhuma instrução registrada.'}
+              </div>
+            )}
+          </div>
+
+          <Separator className="my-4" />
+
+          {/* Impugnações */}
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-destructive" />
+                Impugnações ({impugnacoes.length})
+              </h4>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => setShowImpugnacaoForm(!showImpugnacaoForm)}
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Registrar
+              </Button>
+            </div>
+            {showImpugnacaoForm && (
+              <div className="space-y-2 bg-muted rounded-md p-3">
+                <Textarea
+                  placeholder="Descrição da impugnação..."
+                  value={novaImpugnacao}
+                  onChange={(e) => setNovaImpugnacao(e.target.value)}
+                  className="min-h-[60px] text-sm"
+                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={novaImpugnacaoData}
+                    onChange={(e) => setNovaImpugnacaoData(e.target.value)}
+                    className="w-40 h-7 text-xs"
+                  />
+                  <div className="flex-1" />
+                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowImpugnacaoForm(false)}>
+                    Cancelar
+                  </Button>
+                  <Button size="sm" className="h-7 text-xs" onClick={handleAddImpugnacao} disabled={addingImpugnacao || !novaImpugnacao.trim()}>
+                    Salvar
+                  </Button>
+                </div>
+              </div>
+            )}
+            {impugnacoes.length === 0 && !showImpugnacaoForm ? (
+              <p className="text-xs text-muted-foreground">Nenhuma impugnação registrada.</p>
+            ) : (
+              <div className="space-y-2">
+                {impugnacoes.map((imp) => (
+                  <div key={imp.id} className="bg-card border border-destructive/20 rounded-md p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-destructive">
+                        {format(new Date(imp.data), 'dd/MM/yyyy')}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeleteImpugnacao(imp.id)}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap">{imp.descricao}</p>
+                  </div>
+                ))}
               </div>
             )}
           </div>

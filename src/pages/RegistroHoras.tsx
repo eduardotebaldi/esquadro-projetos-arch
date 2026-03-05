@@ -273,21 +273,7 @@ const RegistroHoras = () => {
   const weekTotal = days.reduce((sum, day) => sum + getDayTotal(format(day, 'yyyy-MM-dd')), 0);
   const expectedTotal = days.reduce((sum, day) => sum + (HORAS_PADRAO[getDay(day)] || 0), 0);
 
-  if (profile?.role && profile.role !== 'arquiteta') {
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <div>
-          <h1 className="text-2xl font-bold">Registro de Horas</h1>
-          <p className="text-muted-foreground text-sm mt-1">Timesheet semanal</p>
-        </div>
-        <div className="bg-card border rounded-lg p-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            Apenas usuários com perfil Arquiteta podem registrar horas.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Removed role restriction - admins and arquitetas can both use this page
 
   return (
     <div className="space-y-6 animate-fade-in">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronRight, ChevronsLeftRight, ChevronsRightLeft } from 'lucide-react';
+import { ChevronRight, ChevronsLeftRight, ChevronsRightLeft, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -163,9 +163,14 @@ const KanbanView = ({ demandas, onRefresh, onDemandaClick }: KanbanViewProps) =>
                     onClick={() => onDemandaClick?.(d)}
                     className="bg-card border rounded-md p-3 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-shadow"
                   >
-                    <p className="text-sm font-medium truncate">
-                      {d.empreendimento?.nome || '—'}
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium truncate">
+                        {d.empreendimento?.nome || '—'}
+                      </p>
+                      {d.impugnacoes?.length > 0 && (
+                        <AlertTriangle className="w-3.5 h-3.5 text-destructive flex-shrink-0 ml-1" />
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">
                       {d.tipo_projeto?.nome || '—'}
                     </p>
