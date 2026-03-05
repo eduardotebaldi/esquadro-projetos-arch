@@ -50,7 +50,7 @@ export interface Comentario {
   id: string;
   demanda_id: string;
   user_id: string;
-  texto: string;
+  conteudo: string;
   created_at: string;
 }
 
