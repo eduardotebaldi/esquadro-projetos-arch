@@ -75,7 +75,7 @@ const App = () => (
               <Route path="/historico" element={<Historico />} />
               <Route path="/horas" element={<RegistroHoras />} />
               <Route path="/relatorio-horas" element={<RelatorioHoras />} />
-              <Route path="/pendencias-horas" element={<AdminRoute><PendenciasHoras /></AdminRoute>} />
+              <Route path="/pendencias-horas" element={<PendenciasHoras />} />
               <Route path="/custos" element={<AdminRoute><CustosIncorridos /></AdminRoute>} />
               <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
             </Route>
