@@ -25,10 +25,10 @@ const navItems = [
   { to: '/historico', icon: BarChart3, label: 'Histórico' },
   { to: '/horas', icon: Clock, label: 'Registro de Horas' },
   { to: '/relatorio-horas', icon: FileBarChart, label: 'Relatório de Horas' },
+  { to: '/pendencias-horas', icon: AlertTriangle, label: 'Pendências de Horas' },
 ];
 
 const adminItems = [
-  { to: '/pendencias-horas', icon: AlertTriangle, label: 'Pendências de Horas' },
   { to: '/custos', icon: DollarSign, label: 'Custos Incorridos' },
   { to: '/configuracoes', icon: Settings, label: 'Configurações' },
 ];
