@@ -14,6 +14,8 @@ import RegistroHoras from "@/pages/RegistroHoras";
 import RelatorioHoras from "@/pages/RelatorioHoras";
 import CustosIncorridos from "@/pages/CustosIncorridos";
 import Configuracoes from "@/pages/Configuracoes";
+import PendenciasHoras from "@/pages/PendenciasHoras";
+import PendenciasModal from "@/components/PendenciasModal";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -63,6 +65,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <PendenciasModal />
           <Routes>
             <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
@@ -72,6 +75,7 @@ const App = () => (
               <Route path="/historico" element={<Historico />} />
               <Route path="/horas" element={<RegistroHoras />} />
               <Route path="/relatorio-horas" element={<RelatorioHoras />} />
+              <Route path="/pendencias-horas" element={<AdminRoute><PendenciasHoras /></AdminRoute>} />
               <Route path="/custos" element={<AdminRoute><CustosIncorridos /></AdminRoute>} />
               <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
             </Route>

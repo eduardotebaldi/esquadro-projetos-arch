@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Building2, ClipboardList, AlertTriangle, Clock, CheckCircle2, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isAfter, isBefore, startOfDay, subDays } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isBefore, startOfDay, subDays } from 'date-fns';
 
 const HORAS_PADRAO: Record<number, number> = {
   1: 8.75, // segunda
@@ -274,35 +275,20 @@ const Dashboard = () => {
 
       {/* Pendências de alocação de horas */}
       {pendencias.length > 0 && (
-        <div className="bg-card border border-destructive/20 rounded-lg p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="w-5 h-5 text-destructive" />
-            <h2 className="text-lg font-semibold">Pendências de Alocação de Horas</h2>
-          </div>
-          <div className="space-y-4">
-            {pendencias.map((p: any) => (
-              <div key={p.id} className="border-b pb-3 last:border-0 last:pb-0">
-                <div className="flex items-center justify-between mb-1.5">
-                  <p className="font-medium text-sm">{p.nome}</p>
-                  <div className="flex items-center gap-3 text-xs">
-                    <span className="text-destructive font-medium">{p.horasFaltantes.toFixed(1)}h faltantes</span>
-                    <Badge variant="secondary" className="text-[10px]">{p.diasPendentes} {p.diasPendentes === 1 ? 'dia' : 'dias'}</Badge>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {p.gaps.map((g: any) => (
-                    <span key={g.data} className="text-[10px] bg-destructive/10 text-destructive rounded px-1.5 py-0.5">
-                      {format(new Date(g.data + 'T12:00:00'), 'dd/MM')} — {g.alocado}h / {g.esperado}h
-                    </span>
-                  ))}
-                  {p.diasPendentes > 5 && (
-                    <span className="text-[10px] text-muted-foreground">+{p.diasPendentes - 5} dias</span>
-                  )}
-                </div>
+        <Link to="/pendencias-horas" className="block">
+          <div className="bg-card border border-destructive/20 rounded-lg p-5 hover:bg-muted/50 transition-colors">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+                <h2 className="text-lg font-semibold">Pendências de Alocação de Horas</h2>
               </div>
-            ))}
+              <Badge variant="destructive">{pendencias.length} {pendencias.length === 1 ? 'profissional' : 'profissionais'}</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              {pendencias.reduce((s: number, p: any) => s + p.horasFaltantes, 0).toFixed(1)}h faltantes no total. Clique para ver detalhes.
+            </p>
           </div>
-        </div>
+        </Link>
       )}
     </div>
   );

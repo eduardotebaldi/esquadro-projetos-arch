@@ -7,6 +7,7 @@ import {
   BarChart3,
   Clock,
   FileBarChart,
+  AlertTriangle,
   DollarSign,
   Settings,
   LogOut,
@@ -27,6 +28,7 @@ const navItems = [
 ];
 
 const adminItems = [
+  { to: '/pendencias-horas', icon: AlertTriangle, label: 'Pendências de Horas' },
   { to: '/custos', icon: DollarSign, label: 'Custos Incorridos' },
   { to: '/configuracoes', icon: Settings, label: 'Configurações' },
 ];
