@@ -3,7 +3,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Building2, ClipboardList, AlertTriangle, Clock, CheckCircle2, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isAfter, isBefore, startOfDay, subDays } from 'date-fns';
+
+const HORAS_PADRAO: Record<number, number> = {
+  1: 8.75, // segunda
+  2: 8.5,  // terça
+  3: 8.5,  // quarta
+  4: 8.5,  // quinta
+  5: 8.5,  // sexta
+  6: 0,    // sábado
+  0: 0,    // domingo
+};
+
+const ALOCACAO_INICIO = new Date('2026-02-23');
 
 const prioridadeLabel: Record<number, string> = { 1: 'Alta', 2: 'Média', 3: 'Baixa' };
 const prioridadeColor: Record<number, string> = {
@@ -24,6 +36,7 @@ const Dashboard = () => {
   });
   const [urgentes, setUrgentes] = useState<any[]>([]);
   const [recentes, setRecentes] = useState<any[]>([]);
+  const [pendencias, setPendencias] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -93,6 +106,62 @@ const Dashboard = () => {
         .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 5);
       setRecentes(recentesList);
+
+      // Pendências de alocação de horas (arquitetas)
+      const ontem = startOfDay(subDays(new Date(), 1));
+      const inicioAlocacao = startOfDay(ALOCACAO_INICIO);
+      if (!isBefore(ontem, inicioAlocacao)) {
+        // Fetch all arquitetas
+        const { data: arquitetas } = await supabase
+          .from('esquadro_profiles')
+          .select('id, nome, email, role')
+          .eq('ativo', true)
+          .eq('role', 'arquiteta');
+
+        // Fetch all hour registrations from start date
+        const { data: allHoras } = await supabase
+          .from('esquadro_registro_horas')
+          .select('user_id, data, horas')
+          .gte('data', format(inicioAlocacao, 'yyyy-MM-dd'))
+          .lte('data', format(ontem, 'yyyy-MM-dd'));
+
+        const horasMap: Record<string, Record<string, number>> = {};
+        (allHoras || []).forEach((r: any) => {
+          if (!horasMap[r.user_id]) horasMap[r.user_id] = {};
+          horasMap[r.user_id][r.data] = (horasMap[r.user_id][r.data] || 0) + (r.horas || 0);
+        });
+
+        const diasCheck = eachDayOfInterval({ start: inicioAlocacao, end: ontem });
+        const pendList: any[] = [];
+
+        (arquitetas || []).forEach((arq: any) => {
+          const userHoras = horasMap[arq.id] || {};
+          const gaps: { data: string; esperado: number; alocado: number }[] = [];
+
+          diasCheck.forEach((dia) => {
+            const esperado = HORAS_PADRAO[getDay(dia)] || 0;
+            if (esperado === 0) return; // skip weekends
+            const dateStr = format(dia, 'yyyy-MM-dd');
+            const alocado = userHoras[dateStr] || 0;
+            if (alocado < esperado) {
+              gaps.push({ data: dateStr, esperado, alocado });
+            }
+          });
+
+          if (gaps.length > 0) {
+            const totalFaltante = gaps.reduce((s, g) => s + (g.esperado - g.alocado), 0);
+            pendList.push({
+              id: arq.id,
+              nome: arq.nome || arq.email,
+              diasPendentes: gaps.length,
+              horasFaltantes: totalFaltante,
+              gaps: gaps.slice(-5), // show last 5 gaps
+            });
+          }
+        });
+
+        setPendencias(pendList.sort((a, b) => b.horasFaltantes - a.horasFaltantes));
+      }
 
       setLoading(false);
     };
@@ -202,6 +271,39 @@ const Dashboard = () => {
           )}
         </div>
       </div>
+
+      {/* Pendências de alocação de horas */}
+      {pendencias.length > 0 && (
+        <div className="bg-card border border-destructive/20 rounded-lg p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="w-5 h-5 text-destructive" />
+            <h2 className="text-lg font-semibold">Pendências de Alocação de Horas</h2>
+          </div>
+          <div className="space-y-4">
+            {pendencias.map((p: any) => (
+              <div key={p.id} className="border-b pb-3 last:border-0 last:pb-0">
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="font-medium text-sm">{p.nome}</p>
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-destructive font-medium">{p.horasFaltantes.toFixed(1)}h faltantes</span>
+                    <Badge variant="secondary" className="text-[10px]">{p.diasPendentes} {p.diasPendentes === 1 ? 'dia' : 'dias'}</Badge>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {p.gaps.map((g: any) => (
+                    <span key={g.data} className="text-[10px] bg-destructive/10 text-destructive rounded px-1.5 py-0.5">
+                      {format(new Date(g.data + 'T12:00:00'), 'dd/MM')} — {g.alocado}h / {g.esperado}h
+                    </span>
+                  ))}
+                  {p.diasPendentes > 5 && (
+                    <span className="text-[10px] text-muted-foreground">+{p.diasPendentes - 5} dias</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
