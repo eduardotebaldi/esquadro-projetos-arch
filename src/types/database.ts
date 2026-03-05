@@ -68,7 +68,7 @@ export interface Profile {
   id: string;
   email: string;
   nome: string | null;
-  role: 'admin' | 'arquiteta' | 'comum';
+  role: 'admin' | 'arquiteta' | 'comum' | 'desativado';
   ativo: boolean;
   custo_hora: number | null;
   created_at: string;
