@@ -67,6 +67,7 @@ const RegistroHoras = () => {
   const [filterStatus, setFilterStatus] = useState<string>(EM_ANDAMENTO_ID);
   const [filterEmpreendimentos, setFilterEmpreendimentos] = useState<string[]>([]);
   const [empreendimentoPopoverOpen, setEmpreendimentoPopoverOpen] = useState(false);
+  const [motivoModalOpen, setMotivoModalOpen] = useState(false);
 
   const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 1 }), [weekStart]);
   const days = useMemo(() => eachDayOfInterval({ start: weekStart, end: weekEnd }), [weekStart, weekEnd]);
