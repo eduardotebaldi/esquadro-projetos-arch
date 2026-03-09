@@ -197,13 +197,29 @@ const RegistroHoras = () => {
     const dateFrom = format(weekStart, 'yyyy-MM-dd');
     const dateTo = format(weekEnd, 'yyyy-MM-dd');
 
-    // Delete all records for this week
+    // Only delete records for visible demandas and motivo rows (not ALL records)
+    const visibleDemandaIds = demandas.map((d: any) => d.id);
+    const visibleMotivoIds = motivoRows.map((r) => r.motivoId).filter(Boolean);
+
+    // Delete demanda hours only for visible demandas
+    if (visibleDemandaIds.length > 0) {
+      await supabase
+        .from('esquadro_registro_horas')
+        .delete()
+        .eq('user_id', user.id)
+        .gte('data', dateFrom)
+        .lte('data', dateTo)
+        .in('demanda_id', visibleDemandaIds);
+    }
+
+    // Delete motivo hours (those without demanda_id)
     await supabase
       .from('esquadro_registro_horas')
       .delete()
       .eq('user_id', user.id)
       .gte('data', dateFrom)
-      .lte('data', dateTo);
+      .lte('data', dateTo)
+      .is('demanda_id', null);
 
     const inserts: any[] = [];
 
@@ -211,6 +227,8 @@ const RegistroHoras = () => {
     Object.entries(cells).forEach(([key, cell]) => {
       if (cell.horas === '' || cell.horas === 0) return;
       const [demanda_id, data] = key.split('__');
+      // Only save cells for visible demandas
+      if (!visibleDemandaIds.includes(demanda_id)) return;
       inserts.push({
         demanda_id,
         user_id: user.id,
