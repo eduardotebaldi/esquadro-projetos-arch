@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
@@ -67,6 +68,7 @@ const RegistroHoras = () => {
   const [filterStatus, setFilterStatus] = useState<string>(EM_ANDAMENTO_ID);
   const [filterEmpreendimentos, setFilterEmpreendimentos] = useState<string[]>([]);
   const [empreendimentoPopoverOpen, setEmpreendimentoPopoverOpen] = useState(false);
+  const [motivoModalOpen, setMotivoModalOpen] = useState(false);
 
   const weekEnd = useMemo(() => endOfWeek(weekStart, { weekStartsOn: 1 }), [weekStart]);
   const days = useMemo(() => eachDayOfInterval({ start: weekStart, end: weekEnd }), [weekStart, weekEnd]);
@@ -167,8 +169,10 @@ const RegistroHoras = () => {
     }));
   };
 
-  const addMotivoRow = () => {
-    setMotivoRows((prev) => [...prev, { tempId: crypto.randomUUID(), motivoId: '', horas: {} }]);
+  const addMotivoRow = (motivoId: string) => {
+    if (!motivoId) return;
+    setMotivoRows((prev) => [...prev, { tempId: crypto.randomUUID(), motivoId, horas: {} }]);
+    setMotivoModalOpen(false);
   };
 
   const removeMotivoRow = (tempId: string) => {
@@ -481,7 +485,7 @@ const RegistroHoras = () => {
                       variant="ghost"
                       size="sm"
                       className="h-6 text-xs gap-1 text-muted-foreground hover:text-foreground"
-                      onClick={addMotivoRow}
+                      onClick={() => setMotivoModalOpen(true)}
                     >
                       <Plus className="w-3 h-3" />
                       Adicionar motivo
@@ -498,22 +502,9 @@ const RegistroHoras = () => {
                 <tr key={row.tempId} className="border-t border-dashed">
                   <td className="px-4 py-2 sticky left-0 bg-card z-10">
                     <div className="flex items-center gap-1">
-                      <Select
-                        value={row.motivoId || 'none'}
-                        onValueChange={(v) => updateMotivoRowMotivo(row.tempId, v === 'none' ? '' : v)}
-                      >
-                        <SelectTrigger className="h-8 text-xs w-[170px]">
-                          <SelectValue placeholder="Selecione o motivo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Selecione...</SelectItem>
-                          {motivos.map((m: any) => (
-                            <SelectItem key={m.id} value={m.id}>
-                              {m.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <p className="text-xs font-medium truncate max-w-[170px]">
+                        {motivos.find((m: any) => m.id === row.motivoId)?.nome || 'Motivo desconhecido'}
+                      </p>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -585,6 +576,32 @@ const RegistroHoras = () => {
         <span>Horas padrão: Seg 8,75h · Ter–Sex 8,5h · Fim de semana 0h</span>
         <span className="text-accent">● Hora extra</span>
       </div>
+
+      {/* Modal para adicionar motivo */}
+      <Dialog open={motivoModalOpen} onOpenChange={setMotivoModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Selecionar motivo de ausência</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 py-4">
+            {motivos.map((m: any) => (
+              <Button
+                key={m.id}
+                variant="outline"
+                className="justify-start text-sm h-10"
+                onClick={() => addMotivoRow(m.id)}
+              >
+                {m.nome}
+              </Button>
+            ))}
+            {motivos.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhum motivo cadastrado.
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
