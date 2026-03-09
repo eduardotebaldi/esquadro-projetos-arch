@@ -27,7 +27,7 @@ const navItems = [
   { to: '/horas', icon: Clock, label: 'Registro de Horas' },
   { to: '/relatorio-horas', icon: FileBarChart, label: 'Relatório de Horas' },
   { to: '/pendencias-horas', icon: AlertTriangle, label: 'Pendências de Horas' },
-  { to: '/impugnacoes', icon: FileBarChart, label: 'Impugnações' },
+  { to: '/impugnacoes', icon: ShieldAlert, label: 'Impugnações' },
 ];
 
 const adminItems = [
