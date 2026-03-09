@@ -15,6 +15,7 @@ import RelatorioHoras from "@/pages/RelatorioHoras";
 import CustosIncorridos from "@/pages/CustosIncorridos";
 import Configuracoes from "@/pages/Configuracoes";
 import PendenciasHoras from "@/pages/PendenciasHoras";
+import Impugnacoes from "@/pages/Impugnacoes";
 import PendenciasModal from "@/components/PendenciasModal";
 import NotFound from "@/pages/NotFound";
 
