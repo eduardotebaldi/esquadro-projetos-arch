@@ -576,6 +576,32 @@ const RegistroHoras = () => {
         <span>Horas padrão: Seg 8,75h · Ter–Sex 8,5h · Fim de semana 0h</span>
         <span className="text-accent">● Hora extra</span>
       </div>
+
+      {/* Modal para adicionar motivo */}
+      <Dialog open={motivoModalOpen} onOpenChange={setMotivoModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Selecionar motivo de ausência</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 py-4">
+            {motivos.map((m: any) => (
+              <Button
+                key={m.id}
+                variant="outline"
+                className="justify-start text-sm h-10"
+                onClick={() => addMotivoRow(m.id)}
+              >
+                {m.nome}
+              </Button>
+            ))}
+            {motivos.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhum motivo cadastrado.
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
