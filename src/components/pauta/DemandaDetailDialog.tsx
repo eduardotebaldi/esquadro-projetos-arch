@@ -9,7 +9,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Send, Pencil, Check, X, AlertTriangle, Plus, Trash2 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Send, Pencil, Check, X, AlertTriangle, Plus, Trash2, ChevronDown } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -29,7 +30,7 @@ interface DemandaDetailDialogProps {
 }
 
 const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: DemandaDetailDialogProps) => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, profile } = useAuth();
   const [comentarios, setComentarios] = useState<any[]>([]);
   const [novoTexto, setNovoTexto] = useState('');
   const [sending, setSending] = useState(false);
@@ -46,6 +47,8 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
   const [addingImpugnacao, setAddingImpugnacao] = useState(false);
   const [showImpugnacaoForm, setShowImpugnacaoForm] = useState(false);
 
+  const canEditInstrucoes = isAdmin || profile?.role === 'arquiteta';
+
   useEffect(() => {
     if (!demanda || !open) return;
     fetchComentarios();
@@ -61,7 +64,6 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
       .eq('demanda_id', demanda.id)
       .order('created_at', { ascending: true });
 
-    // Fetch profiles for comment authors
     const comments = data || [];
     if (comments.length > 0) {
       const userIds = [...new Set(comments.map((c: any) => c.user_id).filter(Boolean))];
@@ -190,7 +192,7 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {demanda.empreendimento?.nome || '—'}
@@ -245,12 +247,12 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 -mx-6 px-6">
+        <div className="flex-1 overflow-y-auto -mx-6 px-6 min-h-0">
           {/* Instruções */}
           <div className="space-y-2 mb-4">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold">Instruções</h4>
-              {isAdmin && !editingInstrucoes && (
+              {canEditInstrucoes && !editingInstrucoes && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -287,7 +289,7 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
 
           <Separator className="my-4" />
 
-          {/* Impugnações */}
+          {/* Impugnações - collapsible */}
           <div className="space-y-2 mb-4">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold flex items-center gap-1.5">
@@ -332,24 +334,37 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
             {impugnacoes.length === 0 && !showImpugnacaoForm ? (
               <p className="text-xs text-muted-foreground">Nenhuma impugnação registrada.</p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {impugnacoes.map((imp) => (
-                  <div key={imp.id} className="bg-card border border-destructive/20 rounded-md p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-medium text-destructive">
-                        {format(new Date(imp.data), 'dd/MM/yyyy')}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5 text-muted-foreground hover:text-destructive"
-                        onClick={() => handleDeleteImpugnacao(imp.id)}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+                  <Collapsible key={imp.id}>
+                    <div className="border border-destructive/20 rounded-md">
+                      <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 text-left hover:bg-muted/50 rounded-md transition-colors">
+                        <span className="text-xs font-medium text-destructive flex items-center gap-2">
+                          {format(new Date(imp.data), 'dd/MM/yyyy')}
+                          <span className="text-muted-foreground font-normal truncate max-w-[300px]">
+                            {imp.descricao?.substring(0, 60)}{imp.descricao?.length > 60 ? '...' : ''}
+                          </span>
+                        </span>
+                        <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0 transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <div className="px-3 pb-3">
+                          <p className="text-sm whitespace-pre-wrap">{imp.descricao}</p>
+                          <div className="flex justify-end mt-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDeleteImpugnacao(imp.id)}
+                            >
+                              <Trash2 className="w-3 h-3 mr-1" />
+                              Excluir
+                            </Button>
+                          </div>
+                        </div>
+                      </CollapsibleContent>
                     </div>
-                    <p className="text-sm whitespace-pre-wrap">{imp.descricao}</p>
-                  </div>
+                  </Collapsible>
                 ))}
               </div>
             )}
@@ -358,7 +373,7 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
           <Separator className="my-4" />
 
           {/* Comentários */}
-          <div className="space-y-3">
+          <div className="space-y-3 pb-2">
             <h4 className="text-sm font-semibold">Comentários ({comentarios.length})</h4>
             {loadingComments ? (
               <p className="text-xs text-muted-foreground">Carregando...</p>
@@ -380,7 +395,7 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         {/* New comment */}
         <div className="flex gap-2 mt-2">
