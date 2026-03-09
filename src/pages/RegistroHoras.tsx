@@ -502,22 +502,9 @@ const RegistroHoras = () => {
                 <tr key={row.tempId} className="border-t border-dashed">
                   <td className="px-4 py-2 sticky left-0 bg-card z-10">
                     <div className="flex items-center gap-1">
-                      <Select
-                        value={row.motivoId || 'none'}
-                        onValueChange={(v) => updateMotivoRowMotivo(row.tempId, v === 'none' ? '' : v)}
-                      >
-                        <SelectTrigger className="h-8 text-xs w-[170px]">
-                          <SelectValue placeholder="Selecione o motivo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Selecione...</SelectItem>
-                          {motivos.map((m: any) => (
-                            <SelectItem key={m.id} value={m.id}>
-                              {m.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <p className="text-xs font-medium truncate max-w-[170px]">
+                        {motivos.find((m: any) => m.id === row.motivoId)?.nome || 'Motivo desconhecido'}
+                      </p>
                       <Button
                         variant="ghost"
                         size="icon"
