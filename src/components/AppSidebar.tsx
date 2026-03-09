@@ -8,6 +8,7 @@ import {
   Clock,
   FileBarChart,
   AlertTriangle,
+  ShieldAlert,
   DollarSign,
   Settings,
   LogOut,
