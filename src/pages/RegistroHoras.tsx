@@ -485,7 +485,7 @@ const RegistroHoras = () => {
                       variant="ghost"
                       size="sm"
                       className="h-6 text-xs gap-1 text-muted-foreground hover:text-foreground"
-                      onClick={addMotivoRow}
+                      onClick={() => setMotivoModalOpen(true)}
                     >
                       <Plus className="w-3 h-3" />
                       Adicionar motivo
