@@ -169,8 +169,10 @@ const RegistroHoras = () => {
     }));
   };
 
-  const addMotivoRow = () => {
-    setMotivoRows((prev) => [...prev, { tempId: crypto.randomUUID(), motivoId: '', horas: {} }]);
+  const addMotivoRow = (motivoId: string) => {
+    if (!motivoId) return;
+    setMotivoRows((prev) => [...prev, { tempId: crypto.randomUUID(), motivoId, horas: {} }]);
+    setMotivoModalOpen(false);
   };
 
   const removeMotivoRow = (tempId: string) => {
