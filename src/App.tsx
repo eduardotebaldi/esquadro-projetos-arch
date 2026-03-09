@@ -77,6 +77,7 @@ const App = () => (
               <Route path="/horas" element={<RegistroHoras />} />
               <Route path="/relatorio-horas" element={<RelatorioHoras />} />
               <Route path="/pendencias-horas" element={<PendenciasHoras />} />
+              <Route path="/impugnacoes" element={<Impugnacoes />} />
               <Route path="/custos" element={<AdminRoute><CustosIncorridos /></AdminRoute>} />
               <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
             </Route>
