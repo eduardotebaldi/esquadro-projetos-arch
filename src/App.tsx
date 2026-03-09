@@ -15,6 +15,7 @@ import RelatorioHoras from "@/pages/RelatorioHoras";
 import CustosIncorridos from "@/pages/CustosIncorridos";
 import Configuracoes from "@/pages/Configuracoes";
 import PendenciasHoras from "@/pages/PendenciasHoras";
+import Impugnacoes from "@/pages/Impugnacoes";
 import PendenciasModal from "@/components/PendenciasModal";
 import NotFound from "@/pages/NotFound";
 
@@ -76,6 +77,7 @@ const App = () => (
               <Route path="/horas" element={<RegistroHoras />} />
               <Route path="/relatorio-horas" element={<RelatorioHoras />} />
               <Route path="/pendencias-horas" element={<PendenciasHoras />} />
+              <Route path="/impugnacoes" element={<Impugnacoes />} />
               <Route path="/custos" element={<AdminRoute><CustosIncorridos /></AdminRoute>} />
               <Route path="/configuracoes" element={<AdminRoute><Configuracoes /></AdminRoute>} />
             </Route>
