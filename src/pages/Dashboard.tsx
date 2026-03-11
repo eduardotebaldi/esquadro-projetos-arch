@@ -57,7 +57,7 @@ const Dashboard = () => {
       const mesInicio = format(startOfMonth(now), 'yyyy-MM-dd');
       const mesFim = format(endOfMonth(now), 'yyyy-MM-dd');
 
-      const [empRes, demRes, horasRes, statusRes] = await Promise.all([
+      const [empRes, demRes, horasRes, statusRes, allHorasRes, arqRes] = await Promise.all([
         supabase.from('esquadro_empreendimentos').select('id', { count: 'exact' }).eq('ativo', true),
         supabase.from('esquadro_demandas').select(`
           *,
@@ -68,6 +68,8 @@ const Dashboard = () => {
         supabase.from('esquadro_registro_horas').select('horas, user_id')
           .gte('data', mesInicio).lte('data', mesFim),
         supabase.from('esquadro_status').select('id, nome').eq('ativo', true),
+        supabase.from('esquadro_registro_horas').select('demanda_id, data'),
+        supabase.from('esquadro_profiles').select('id, nome, email, role').eq('ativo', true).eq('role', 'arquiteta'),
       ]);
 
       const allDemandas = demRes.data || [];
