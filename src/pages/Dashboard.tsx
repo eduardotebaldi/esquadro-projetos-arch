@@ -43,6 +43,14 @@ const Dashboard = () => {
   const [pendencias, setPendencias] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Indicador de conclusão no prazo
+  const [allDemandasRaw, setAllDemandasRaw] = useState<any[]>([]);
+  const [allStatusRaw, setAllStatusRaw] = useState<any[]>([]);
+  const [allHorasRaw, setAllHorasRaw] = useState<any[]>([]);
+  const [allArquitetas, setAllArquitetas] = useState<any[]>([]);
+  const [indicadorArqFilter, setIndicadorArqFilter] = useState('all');
+  const [indicadorModalOpen, setIndicadorModalOpen] = useState(false);
+
   useEffect(() => {
     const fetchData = async () => {
       const now = new Date();
