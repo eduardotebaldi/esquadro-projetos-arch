@@ -177,6 +177,12 @@ const Dashboard = () => {
         setPendencias(pendList.sort((a, b) => b.horasFaltantes - a.horasFaltantes));
       }
 
+      // Store raw data for indicator
+      setAllDemandasRaw(allDemandas);
+      setAllStatusRaw(allStatus);
+      setAllHorasRaw(allHorasRes.data || []);
+      setAllArquitetas(arqRes.data || []);
+
       setLoading(false);
     };
     fetchData();
