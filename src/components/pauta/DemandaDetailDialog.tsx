@@ -62,7 +62,7 @@ const DemandaDetailDialog = ({ demanda, open, onOpenChange, onRefresh }: Demanda
       .from('esquadro_comentarios')
       .select('*')
       .eq('demanda_id', demanda.id)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: false });
 
     const comments = data || [];
     if (comments.length > 0) {
