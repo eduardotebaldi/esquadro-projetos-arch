@@ -32,9 +32,10 @@ const CustosIncorridos = () => {
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
-  // Sort & collapse
+  // Sort, collapse & view mode
   const [sortBy, setSortBy] = useState<'custo' | 'horas'>('custo');
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'projetos' | 'medias'>('projetos');
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -224,178 +225,228 @@ const CustosIncorridos = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-center">
-        {/* Date from */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className={cn("h-9 gap-1.5 min-w-[130px] justify-start", !dateFrom && "text-muted-foreground")}>
-              <CalendarIcon className="h-3.5 w-3.5" />
-              {dateFrom ? format(dateFrom, 'dd/MM/yyyy') : 'Data início'}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={pt} className="p-3 pointer-events-auto" />
-          </PopoverContent>
-        </Popover>
-
-        {/* Date to */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className={cn("h-9 gap-1.5 min-w-[130px] justify-start", !dateTo && "text-muted-foreground")}>
-              <CalendarIcon className="h-3.5 w-3.5" />
-              {dateTo ? format(dateTo, 'dd/MM/yyyy') : 'Data fim'}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={pt} className="p-3 pointer-events-auto" />
-          </PopoverContent>
-        </Popover>
-
-        <MultiSelectFilter
-          label="Empreendimento"
-          options={empreendimentos}
-          selected={selEmps}
-          onToggle={(id) => toggleFilter(selEmps, setSelEmps, id)}
-        />
-        <MultiSelectFilter
-          label="Status"
-          options={statusList}
-          selected={selStatus}
-          onToggle={(id) => toggleFilter(selStatus, setSelStatus, id)}
-        />
-        <MultiSelectFilter
-          label="Tipo de Projeto"
-          options={tiposProjeto}
-          selected={selTipos}
-          onToggle={(id) => toggleFilter(selTipos, setSelTipos, id)}
-        />
-        <MultiSelectFilter
-          label="Arquiteta"
-          options={arquitetas.map((a: any) => ({ id: a.id, nome: a.nome || a.email }))}
-          selected={selArqs}
-          onToggle={(id) => toggleFilter(selArqs, setSelArqs, id)}
-        />
-
-        {/* Sort */}
-        <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'custo' | 'horas')}>
-          <SelectTrigger className="h-9 w-[160px]">
-            <div className="flex items-center gap-1.5">
-              <ArrowUpDown className="h-3.5 w-3.5" />
-              <SelectValue />
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="custo">Ordenar por Custo</SelectItem>
-            <SelectItem value="horas">Ordenar por Horas</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* Clear filters */}
-        {(selEmps.length > 0 || selStatus.length > 0 || selTipos.length > 0 || selArqs.length > 0 || dateFrom || dateTo) && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-9 text-muted-foreground"
-            onClick={() => { setSelEmps([]); setSelStatus([]); setSelTipos([]); setSelArqs([]); setDateFrom(undefined); setDateTo(undefined); }}
-          >
-            Limpar filtros
-          </Button>
-        )}
-      </div>
-
-      {/* Cost list - collapsible */}
-      {loading ? (
-        <p className="text-sm text-muted-foreground text-center py-8">Carregando...</p>
-      ) : custosPorDemanda.length === 0 ? (
-        <div className="bg-card border rounded-lg p-12 text-center">
-          <DollarSign className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
-          <p className="text-muted-foreground text-sm">Nenhum custo registrado.</p>
+      <div className="bg-card border rounded-lg p-4 space-y-3">
+        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          <CalendarIcon className="h-3.5 w-3.5" />
+          Período
         </div>
-      ) : (
-        <div className="space-y-2">
-          {custosPorDemanda.map((d: any) => {
-            const isOpen = openIds.has(d.id);
-            return (
-              <Collapsible key={d.id} open={isOpen} onOpenChange={() => toggleOpen(d.id)}>
-                <CollapsibleTrigger asChild>
-                  <div className="bg-card border rounded-lg px-5 py-3.5 flex items-center justify-between cursor-pointer hover:bg-accent/30 transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {isOpen
-                        ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      }
-                      <div className="min-w-0">
-                        <p className="font-semibold truncate">{d.empreendimento?.nome}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-muted-foreground">{d.tipo_projeto?.nome}</span>
-                          <Badge variant="outline" className="text-xs px-1.5 py-0">
-                            {d.status?.nome}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-lg font-bold tabular-nums whitespace-nowrap ml-4">
-                      R$ {d.custoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                </CollapsibleTrigger>
-
-                <CollapsibleContent>
-                  <div className="bg-card border border-t-0 rounded-b-lg px-5 pb-4 pt-2 -mt-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm text-muted-foreground">
-                        {d.totalHoras}h {d.horas_estimadas ? `/ ${d.horas_estimadas}h estimadas` : ''}
-                      </p>
-                    </div>
-
-                    {d.horas_estimadas && (
-                      <div className="mb-3">
-                        <Progress value={d.progresso} className="h-2" />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {d.progresso.toFixed(0)}% das horas estimadas
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="border-t pt-3 space-y-1.5">
-                      {Object.values(d.porUsuario as Record<string, any>).map((u: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">{u.nome}</span>
-                          <div className="flex items-center gap-4">
-                            <span className="tabular-nums text-muted-foreground">{u.horas}h</span>
-                            <span className="tabular-nums font-medium">
-                              R$ {u.custo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            );
-          })}
+        <div className="flex flex-wrap gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn("h-9 gap-1.5 min-w-[140px] justify-start", !dateFrom && "text-muted-foreground")}>
+                <CalendarIcon className="h-3.5 w-3.5" />
+                {dateFrom ? format(dateFrom, 'dd/MM/yyyy') : 'Data início'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} locale={pt} className="p-3 pointer-events-auto" />
+            </PopoverContent>
+          </Popover>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className={cn("h-9 gap-1.5 min-w-[140px] justify-start", !dateTo && "text-muted-foreground")}>
+                <CalendarIcon className="h-3.5 w-3.5" />
+                {dateTo ? format(dateTo, 'dd/MM/yyyy') : 'Data fim'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={dateTo} onSelect={setDateTo} locale={pt} className="p-3 pointer-events-auto" />
+            </PopoverContent>
+          </Popover>
         </div>
-      )}
 
-      {/* Average cost by project type */}
-      {!loading && mediasPorTipo.length > 0 && (
-        <div className="bg-card border rounded-lg p-5">
-          <h2 className="font-semibold mb-3">Média de Custo por Tipo de Projeto</h2>
-          <div className="space-y-2">
-            {mediasPorTipo.map((m, i) => (
-              <div key={i} className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <span>{m.nome}</span>
-                  <span className="text-xs text-muted-foreground">({m.count} projeto{m.count > 1 ? 's' : ''})</span>
-                </div>
-                <span className="tabular-nums font-medium">
-                  R$ {m.media.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            ))}
+        <div className="border-t pt-3">
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            Filtros
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <MultiSelectFilter
+              label="Empreendimento"
+              options={empreendimentos}
+              selected={selEmps}
+              onToggle={(id) => toggleFilter(selEmps, setSelEmps, id)}
+            />
+            <MultiSelectFilter
+              label="Status"
+              options={statusList}
+              selected={selStatus}
+              onToggle={(id) => toggleFilter(selStatus, setSelStatus, id)}
+            />
+            <MultiSelectFilter
+              label="Tipo de Projeto"
+              options={tiposProjeto}
+              selected={selTipos}
+              onToggle={(id) => toggleFilter(selTipos, setSelTipos, id)}
+            />
+            <MultiSelectFilter
+              label="Arquiteta"
+              options={arquitetas.map((a: any) => ({ id: a.id, nome: a.nome || a.email }))}
+              selected={selArqs}
+              onToggle={(id) => toggleFilter(selArqs, setSelArqs, id)}
+            />
           </div>
         </div>
+
+        <div className="border-t pt-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'custo' | 'horas')}>
+              <SelectTrigger className="h-9 w-[170px]">
+                <div className="flex items-center gap-1.5">
+                  <ArrowUpDown className="h-3.5 w-3.5" />
+                  <SelectValue />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="custo">Ordenar por Custo</SelectItem>
+                <SelectItem value="horas">Ordenar por Horas</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {(selEmps.length > 0 || selStatus.length > 0 || selTipos.length > 0 || selArqs.length > 0 || dateFrom || dateTo) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 text-muted-foreground"
+              onClick={() => { setSelEmps([]); setSelStatus([]); setSelTipos([]); setSelArqs([]); setDateFrom(undefined); setDateTo(undefined); }}
+            >
+              Limpar filtros
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* View mode tabs */}
+      <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
+        <button
+          onClick={() => setViewMode('projetos')}
+          className={cn(
+            "px-4 py-2 rounded-md text-sm font-medium transition-colors",
+            viewMode === 'projetos'
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Relação de Projetos
+        </button>
+        <button
+          onClick={() => setViewMode('medias')}
+          className={cn(
+            "px-4 py-2 rounded-md text-sm font-medium transition-colors",
+            viewMode === 'medias'
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          Média de Custos
+        </button>
+      </div>
+
+      {/* Content based on view mode */}
+      {viewMode === 'projetos' ? (
+        <>
+          {loading ? (
+            <p className="text-sm text-muted-foreground text-center py-8">Carregando...</p>
+          ) : custosPorDemanda.length === 0 ? (
+            <div className="bg-card border rounded-lg p-12 text-center">
+              <DollarSign className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-muted-foreground text-sm">Nenhum custo registrado.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {custosPorDemanda.map((d: any) => {
+                const isOpen = openIds.has(d.id);
+                return (
+                  <Collapsible key={d.id} open={isOpen} onOpenChange={() => toggleOpen(d.id)}>
+                    <CollapsibleTrigger asChild>
+                      <div className="bg-card border rounded-lg px-5 py-3.5 flex items-center justify-between cursor-pointer hover:bg-accent/30 transition-colors">
+                        <div className="flex items-center gap-3 min-w-0">
+                          {isOpen
+                            ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          }
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">{d.empreendimento?.nome}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-xs text-muted-foreground">{d.tipo_projeto?.nome}</span>
+                              <Badge variant="outline" className="text-xs px-1.5 py-0">
+                                {d.status?.nome}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                        <p className="text-lg font-bold tabular-nums whitespace-nowrap ml-4">
+                          R$ {d.custoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    </CollapsibleTrigger>
+
+                    <CollapsibleContent>
+                      <div className="bg-card border border-t-0 rounded-b-lg px-5 pb-4 pt-2 -mt-1">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm text-muted-foreground">
+                            {d.totalHoras}h {d.horas_estimadas ? `/ ${d.horas_estimadas}h estimadas` : ''}
+                          </p>
+                        </div>
+
+                        {d.horas_estimadas && (
+                          <div className="mb-3">
+                            <Progress value={d.progresso} className="h-2" />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {d.progresso.toFixed(0)}% das horas estimadas
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="border-t pt-3 space-y-1.5">
+                          {Object.values(d.porUsuario as Record<string, any>).map((u: any, i: number) => (
+                            <div key={i} className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">{u.nome}</span>
+                              <div className="flex items-center gap-4">
+                                <span className="tabular-nums text-muted-foreground">{u.horas}h</span>
+                                <span className="tabular-nums font-medium">
+                                  R$ {u.custo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              })}
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          {loading ? (
+            <p className="text-sm text-muted-foreground text-center py-8">Carregando...</p>
+          ) : mediasPorTipo.length === 0 ? (
+            <div className="bg-card border rounded-lg p-12 text-center">
+              <DollarSign className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-muted-foreground text-sm">Nenhum dado para exibir.</p>
+            </div>
+          ) : (
+            <div className="bg-card border rounded-lg p-5 space-y-4">
+              <h2 className="font-semibold">Média de Custo por Tipo de Projeto</h2>
+              <div className="space-y-3">
+                {mediasPorTipo.map((m, i) => (
+                  <div key={i} className="flex items-center justify-between py-2 border-b last:border-0">
+                    <div>
+                      <p className="text-sm font-medium">{m.nome}</p>
+                      <p className="text-xs text-muted-foreground">{m.count} projeto{m.count > 1 ? 's' : ''} · Total: R$ {m.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <p className="text-lg font-bold tabular-nums">
+                      R$ {m.media.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
