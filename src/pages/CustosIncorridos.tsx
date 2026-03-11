@@ -32,9 +32,10 @@ const CustosIncorridos = () => {
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
 
-  // Sort & collapse
+  // Sort, collapse & view mode
   const [sortBy, setSortBy] = useState<'custo' | 'horas'>('custo');
   const [openIds, setOpenIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'projetos' | 'medias'>('projetos');
 
   useEffect(() => {
     const fetchAll = async () => {
