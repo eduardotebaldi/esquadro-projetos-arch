@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Building2, ClipboardList, AlertTriangle, Clock, CheckCircle2, Users } from 'lucide-react';
+import { Building2, ClipboardList, AlertTriangle, Clock, CheckCircle2, Users, Target } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isBefore, startOfDay, subDays } from 'date-fns';
 
 const HORAS_PADRAO: Record<number, number> = {
@@ -40,13 +43,21 @@ const Dashboard = () => {
   const [pendencias, setPendencias] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Indicador de conclusão no prazo
+  const [allDemandasRaw, setAllDemandasRaw] = useState<any[]>([]);
+  const [allStatusRaw, setAllStatusRaw] = useState<any[]>([]);
+  const [allHorasRaw, setAllHorasRaw] = useState<any[]>([]);
+  const [allArquitetas, setAllArquitetas] = useState<any[]>([]);
+  const [indicadorArqFilter, setIndicadorArqFilter] = useState('all');
+  const [indicadorModalOpen, setIndicadorModalOpen] = useState(false);
+
   useEffect(() => {
     const fetchData = async () => {
       const now = new Date();
       const mesInicio = format(startOfMonth(now), 'yyyy-MM-dd');
       const mesFim = format(endOfMonth(now), 'yyyy-MM-dd');
 
-      const [empRes, demRes, horasRes, statusRes] = await Promise.all([
+      const [empRes, demRes, horasRes, statusRes, allHorasRes, arqRes] = await Promise.all([
         supabase.from('esquadro_empreendimentos').select('id', { count: 'exact' }).eq('ativo', true),
         supabase.from('esquadro_demandas').select(`
           *,
@@ -57,6 +68,8 @@ const Dashboard = () => {
         supabase.from('esquadro_registro_horas').select('horas, user_id')
           .gte('data', mesInicio).lte('data', mesFim),
         supabase.from('esquadro_status').select('id, nome').eq('ativo', true),
+        supabase.from('esquadro_registro_horas').select('demanda_id, data'),
+        supabase.from('esquadro_profiles').select('id, nome, email, role').eq('ativo', true).eq('role', 'arquiteta'),
       ]);
 
       const allDemandas = demRes.data || [];
@@ -164,6 +177,12 @@ const Dashboard = () => {
         setPendencias(pendList.sort((a, b) => b.horasFaltantes - a.horasFaltantes));
       }
 
+      // Store raw data for indicator
+      setAllDemandasRaw(allDemandas);
+      setAllStatusRaw(allStatus);
+      setAllHorasRaw(allHorasRes.data || []);
+      setAllArquitetas(arqRes.data || []);
+
       setLoading(false);
     };
     fetchData();
@@ -177,6 +196,60 @@ const Dashboard = () => {
     { label: 'Empreendimentos', value: stats.empreendimentos, icon: Building2, color: 'bg-accent' },
     { label: isAdmin ? 'Horas no Mês (Equipe)' : 'Minhas Horas no Mês', value: `${stats.horasMes.toFixed(1)}h`, icon: Users, color: 'bg-primary' },
   ];
+
+  // Indicador de conclusão no prazo - semestral
+  const indicadorData = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const isFirstHalf = now.getMonth() < 6;
+    const semStart = isFirstHalf ? `${year}-01-01` : `${year}-07-01`;
+    const semEnd = isFirstHalf ? `${year}-06-30` : `${year}-12-31`;
+    const semLabel = isFirstHalf ? `1º Semestre ${year}` : `2º Semestre ${year}`;
+
+    const concluidoIds = allStatusRaw
+      .filter((s: any) => s.nome.toLowerCase().includes('conclu'))
+      .map((s: any) => s.id);
+
+    // Build last hour date per demanda (proxy for completion date)
+    const lastDateMap: Record<string, string> = {};
+    allHorasRaw.forEach((h: any) => {
+      if (!lastDateMap[h.demanda_id] || h.data > lastDateMap[h.demanda_id]) {
+        lastDateMap[h.demanda_id] = h.data;
+      }
+    });
+
+    // Filter demandas: concluded, with prazo, completion date in semester
+    const elegiveis = allDemandasRaw.filter((d: any) => {
+      if (!concluidoIds.includes(d.status_id)) return false;
+      if (!d.prazo) return false;
+      if (indicadorArqFilter !== 'all' && d.arquiteta_id !== indicadorArqFilter) return false;
+      const completionDate = lastDateMap[d.id];
+      if (!completionDate) return false;
+      return completionDate >= semStart && completionDate <= semEnd;
+    });
+
+    const noPrazo = elegiveis.filter((d: any) => {
+      const completionDate = lastDateMap[d.id];
+      return completionDate <= d.prazo;
+    });
+
+    const detalhes = elegiveis.map((d: any) => {
+      const completionDate = lastDateMap[d.id];
+      const onTime = completionDate <= d.prazo;
+      return {
+        id: d.id,
+        empreendimento: d.empreendimento?.nome || '—',
+        tipo: d.tipo_projeto?.nome || '—',
+        prazo: d.prazo,
+        dataConclusao: completionDate,
+        noPrazo: onTime,
+      };
+    });
+
+    const percentual = elegiveis.length > 0 ? (noPrazo.length / elegiveis.length) * 100 : null;
+
+    return { semLabel, total: elegiveis.length, noPrazo: noPrazo.length, percentual, detalhes };
+  }, [allDemandasRaw, allStatusRaw, allHorasRaw, indicadorArqFilter]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -204,6 +277,123 @@ const Dashboard = () => {
           </div>
         </Link>
       )}
+
+      {/* Indicador de Conclusão no Prazo */}
+      {!loading && (
+        <div className="bg-card border rounded-lg p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold">Conclusão no Prazo</h2>
+              <span className="text-xs text-muted-foreground">({indicadorData.semLabel})</span>
+            </div>
+            <Select value={indicadorArqFilter} onValueChange={setIndicadorArqFilter}>
+              <SelectTrigger className="h-8 w-[180px] text-xs">
+                <SelectValue placeholder="Filtrar por arquiteta" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as arquitetas</SelectItem>
+                {allArquitetas.map((a: any) => (
+                  <SelectItem key={a.id} value={a.id}>{a.nome || a.email}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {indicadorData.total === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum projeto concluído com prazo neste semestre.</p>
+          ) : (
+            <div
+              className="flex items-center gap-6 cursor-pointer hover:bg-accent/20 rounded-lg p-3 -m-3 transition-colors"
+              onClick={() => setIndicadorModalOpen(true)}
+            >
+              <div className="relative w-20 h-20 flex-shrink-0">
+                <svg viewBox="0 0 36 36" className="w-20 h-20 -rotate-90">
+                  <path
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    fill="none"
+                    className="stroke-muted"
+                    strokeWidth="3"
+                  />
+                  <path
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    fill="none"
+                    className={indicadorData.percentual! >= 70 ? 'stroke-primary' : 'stroke-destructive'}
+                    strokeWidth="3"
+                    strokeDasharray={`${indicadorData.percentual}, 100`}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-lg font-bold">{indicadorData.percentual!.toFixed(0)}%</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm">
+                  <span className="font-semibold">{indicadorData.noPrazo}</span> de{' '}
+                  <span className="font-semibold">{indicadorData.total}</span> projetos concluídos no prazo
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Clique para ver a memória de cálculo</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal memória de cálculo */}
+      <Dialog open={indicadorModalOpen} onOpenChange={setIndicadorModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Memória de Cálculo — Conclusão no Prazo ({indicadorData.semLabel})</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto min-h-0 space-y-4">
+            <div className="bg-muted/50 rounded-lg p-4">
+              <p className="text-sm">
+                <strong>Fórmula:</strong> Projetos concluídos no prazo ÷ Total de projetos concluídos com prazo
+              </p>
+              <p className="text-sm mt-1">
+                <strong>Resultado:</strong> {indicadorData.noPrazo} ÷ {indicadorData.total} ={' '}
+                {indicadorData.percentual !== null ? `${indicadorData.percentual.toFixed(1)}%` : '—'}
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                * Data de conclusão baseada no último registro de horas do projeto.
+                Projetos sem prazo definido não entram no cálculo.
+              </p>
+            </div>
+
+            {indicadorData.detalhes.length > 0 && (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="text-left p-3 font-medium">Projeto</th>
+                      <th className="text-left p-3 font-medium">Tipo</th>
+                      <th className="text-left p-3 font-medium">Prazo</th>
+                      <th className="text-left p-3 font-medium">Conclusão</th>
+                      <th className="text-center p-3 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {indicadorData.detalhes.map((d) => (
+                      <tr key={d.id} className="border-t">
+                        <td className="p-3">{d.empreendimento}</td>
+                        <td className="p-3 text-muted-foreground">{d.tipo}</td>
+                        <td className="p-3 tabular-nums">{format(new Date(d.prazo + 'T12:00:00'), 'dd/MM/yyyy')}</td>
+                        <td className="p-3 tabular-nums">{format(new Date(d.dataConclusao + 'T12:00:00'), 'dd/MM/yyyy')}</td>
+                        <td className="p-3 text-center">
+                          <Badge variant={d.noPrazo ? 'default' : 'destructive'} className="text-xs">
+                            {d.noPrazo ? 'No prazo' : 'Atrasado'}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {statCards.map((stat) => (
