@@ -606,10 +606,14 @@ const RegistroHoras = () => {
           <div className="flex flex-col gap-2 py-4">
             {motivos.map((m: any) => (
               <Button
+                type="button"
                 key={m.id}
                 variant="outline"
                 className="justify-start text-sm h-10"
-                onClick={() => addMotivoRow(m.id)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  addMotivoRow(m.id);
+                }}
               >
                 {m.nome}
               </Button>

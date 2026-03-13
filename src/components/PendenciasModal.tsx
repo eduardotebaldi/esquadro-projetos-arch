@@ -71,9 +71,9 @@ const PendenciasModal = () => {
     };
 
     checkPendencias();
-  }, [location.pathname, profile?.id, profile?.role]);
+  }, [loading, location.pathname, profile?.id, profile?.role]);
 
-  if (profile?.role !== 'arquiteta' || gaps.length === 0) return null;
+  if (loading || location.pathname === '/horas' || profile?.role !== 'arquiteta' || gaps.length === 0) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
