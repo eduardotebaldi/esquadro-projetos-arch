@@ -494,10 +494,14 @@ const RegistroHoras = () => {
                       Ausências
                     </p>
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
                       className="h-6 text-xs gap-1 text-muted-foreground hover:text-foreground"
-                      onClick={() => setMotivoModalOpen(true)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setMotivoModalOpen(true);
+                      }}
                     >
                       <Plus className="w-3 h-3" />
                       Adicionar motivo
@@ -518,10 +522,14 @@ const RegistroHoras = () => {
                         {motivos.find((m: any) => m.id === row.motivoId)?.nome || 'Motivo desconhecido'}
                       </p>
                       <Button
+                        type="button"
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                        onClick={() => removeMotivoRow(row.tempId)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          removeMotivoRow(row.tempId);
+                        }}
                       >
                         <X className="w-3 h-3" />
                       </Button>
