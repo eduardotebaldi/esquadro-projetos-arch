@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { FileText, Send, Eye, ChevronDown } from 'lucide-react';
+import { FileText, Send, Eye, Clock, CalendarClock, Mail } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import {
   format,
@@ -30,7 +30,10 @@ interface ReportConfig {
   nome: string;
   descricao: string;
   ativo: boolean;
-  destinatarios: string[]; // array of profile ids
+  destinatarios: string[];
+  frequencia: string;
+  horario: string;
+  ultimo_envio: string | null;
 }
 
 const HORAS_PADRAO: Record<number, number> = {
@@ -40,9 +43,12 @@ const HORAS_PADRAO: Record<number, number> = {
 const DEFAULT_REPORTS: Omit<ReportConfig, 'id'>[] = [
   {
     nome: 'Relatório Semanal de Projetos',
-    descricao: 'Enviado toda segunda-feira às 08:00. Inclui lista de projetos em andamento com prazo, prioridade, data de início e horas gastas, além do relatório completo de horas da semana anterior.',
+    descricao: 'Inclui lista de projetos em andamento com prazo, prioridade, data de início e horas gastas, além do relatório completo de horas da semana anterior.',
     ativo: true,
     destinatarios: [],
+    frequencia: 'Toda segunda-feira',
+    horario: '08:00',
+    ultimo_envio: null,
   },
 ];
 
@@ -54,6 +60,7 @@ const ConfigRelatorios = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewData, setPreviewData] = useState<any>(null);
   const [generatingPreview, setGeneratingPreview] = useState(false);
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -72,17 +79,28 @@ const ConfigRelatorios = () => {
 
       setUsuarios(usuariosRes.data || []);
 
+      const mapReport = (r: any): ReportConfig => ({
+        id: r.id,
+        nome: r.nome,
+        descricao: r.descricao,
+        ativo: r.ativo,
+        destinatarios: r.destinatarios || [],
+        frequencia: r.frequencia || 'Toda segunda-feira',
+        horario: r.horario || '08:00',
+        ultimo_envio: r.ultimo_envio || null,
+      });
+
       if (reportsRes.error) {
-        // Table might not exist yet — use defaults in memory
-        console.warn('Tabela esquadro_relatorios_config não encontrada, usando padrões:', reportsRes.error.message);
+        console.warn('Tabela esquadro_relatorios_config não encontrada:', reportsRes.error.message);
         setReports(DEFAULT_REPORTS.map((r, i) => ({ ...r, id: `default-${i}` })));
       } else if ((reportsRes.data || []).length === 0) {
-        // Table exists but empty — seed defaults
         const inserts = DEFAULT_REPORTS.map((r) => ({
           nome: r.nome,
           descricao: r.descricao,
           ativo: r.ativo,
           destinatarios: r.destinatarios,
+          frequencia: r.frequencia,
+          horario: r.horario,
         }));
         const { data: inserted, error: insertError } = await supabase
           .from('esquadro_relatorios_config')
@@ -92,22 +110,10 @@ const ConfigRelatorios = () => {
           console.error('Erro ao criar relatórios padrão:', insertError.message);
           setReports(DEFAULT_REPORTS.map((r, i) => ({ ...r, id: `default-${i}` })));
         } else {
-          setReports((inserted || []).map((r: any) => ({
-            id: r.id,
-            nome: r.nome,
-            descricao: r.descricao,
-            ativo: r.ativo,
-            destinatarios: r.destinatarios || [],
-          })));
+          setReports((inserted || []).map(mapReport));
         }
       } else {
-        setReports((reportsRes.data || []).map((r: any) => ({
-          id: r.id,
-          nome: r.nome,
-          descricao: r.descricao,
-          ativo: r.ativo,
-          destinatarios: r.destinatarios || [],
-        })));
+        setReports((reportsRes.data || []).map(mapReport));
       }
     } catch (err) {
       console.error('Erro ao carregar relatórios:', err);
@@ -122,7 +128,6 @@ const ConfigRelatorios = () => {
 
   const updateReport = async (reportId: string, updates: Partial<ReportConfig>) => {
     setSaving(true);
-    // Update local state immediately
     setReports((prev) =>
       prev.map((r) => (r.id === reportId ? { ...r, ...updates } : r))
     );
@@ -134,7 +139,7 @@ const ConfigRelatorios = () => {
         .eq('id', reportId);
       if (error) {
         toast({ title: 'Erro ao salvar', description: error.message, variant: 'destructive' });
-        fetchData(); // revert
+        fetchData();
       }
     }
     setSaving(false);
@@ -149,91 +154,137 @@ const ConfigRelatorios = () => {
     updateReport(reportId, { destinatarios: newDest });
   };
 
-  const generatePreview = async () => {
+  const generatePreviewData = async () => {
+    const lastWeekStart = startOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 });
+    const lastWeekEnd = endOfWeek(lastWeekStart, { weekStartsOn: 1 });
+    const dateFrom = format(lastWeekStart, 'yyyy-MM-dd');
+    const dateTo = format(lastWeekEnd, 'yyyy-MM-dd');
+
+    const emAndamentoId = '819a3d87-3884-4223-ac1b-7262434f0828';
+    const [demandasRes, horasRes, allUsuariosRes] = await Promise.all([
+      supabase
+        .from('esquadro_demandas')
+        .select(`
+          id, prioridade, prazo, created_at,
+          empreendimento:esquadro_empreendimentos(nome),
+          tipo_projeto:esquadro_tipos_projeto(nome),
+          status:esquadro_status(nome)
+        `)
+        .eq('status_id', emAndamentoId)
+        .order('prioridade'),
+      supabase
+        .from('esquadro_registro_horas')
+        .select('user_id, demanda_id, data, horas')
+        .gte('data', dateFrom)
+        .lte('data', dateTo),
+      supabase
+        .from('esquadro_profiles')
+        .select('id, nome, email')
+        .eq('ativo', true),
+    ]);
+
+    const horasTotalRes = await supabase
+      .from('esquadro_registro_horas')
+      .select('demanda_id, horas')
+      .not('demanda_id', 'is', null);
+
+    const horasPorDemanda: Record<string, number> = {};
+    (horasTotalRes.data || []).forEach((r: any) => {
+      if (r.demanda_id) {
+        horasPorDemanda[r.demanda_id] = (horasPorDemanda[r.demanda_id] || 0) + (r.horas || 0);
+      }
+    });
+
+    const horasPorUsuario: Record<string, Record<string, number>> = {};
+    (horasRes.data || []).forEach((r: any) => {
+      if (!horasPorUsuario[r.user_id]) horasPorUsuario[r.user_id] = {};
+      horasPorUsuario[r.user_id][r.data] = (horasPorUsuario[r.user_id][r.data] || 0) + (r.horas || 0);
+    });
+
+    return {
+      periodo: `${format(lastWeekStart, "dd/MM/yyyy")} a ${format(lastWeekEnd, "dd/MM/yyyy")}`,
+      demandas: (demandasRes.data || []).map((d: any) => ({
+        empreendimento: d.empreendimento?.nome || '—',
+        tipoProjeto: d.tipo_projeto?.nome || '—',
+        status: d.status?.nome || '—',
+        prioridade: d.prioridade || '—',
+        prazo: d.prazo ? format(new Date(d.prazo + 'T12:00:00'), 'dd/MM/yyyy') : '—',
+        inicio: d.created_at ? format(new Date(d.created_at), 'dd/MM/yyyy') : '—',
+        horasGastas: horasPorDemanda[d.id] ? horasPorDemanda[d.id].toFixed(1) : '0',
+      })),
+      horasUsuarios: (allUsuariosRes.data || []).map((u: any) => {
+        const userHoras = horasPorUsuario[u.id] || {};
+        const days: { data: string; horas: number }[] = [];
+        let total = 0;
+        for (let i = 0; i < 7; i++) {
+          const d = new Date(lastWeekStart);
+          d.setDate(d.getDate() + i);
+          const dateStr = format(d, 'yyyy-MM-dd');
+          const h = userHoras[dateStr] || 0;
+          days.push({ data: dateStr, horas: h });
+          total += h;
+        }
+        return { nome: u.nome || u.email, days, total };
+      }).filter((u: any) => u.total > 0),
+      lastWeekStart,
+    };
+  };
+
+  const handlePreview = async () => {
     setGeneratingPreview(true);
     try {
-      const lastWeekStart = startOfWeek(subWeeks(new Date(), 1), { weekStartsOn: 1 });
-      const lastWeekEnd = endOfWeek(lastWeekStart, { weekStartsOn: 1 });
-      const dateFrom = format(lastWeekStart, 'yyyy-MM-dd');
-      const dateTo = format(lastWeekEnd, 'yyyy-MM-dd');
-
-      // Fetch projects in progress
-      const emAndamentoId = '819a3d87-3884-4223-ac1b-7262434f0828';
-      const [demandasRes, horasRes, allUsuariosRes] = await Promise.all([
-        supabase
-          .from('esquadro_demandas')
-          .select(`
-            id, prioridade, prazo, created_at,
-            empreendimento:esquadro_empreendimentos(nome),
-            tipo_projeto:esquadro_tipos_projeto(nome),
-            status:esquadro_status(nome)
-          `)
-          .eq('status_id', emAndamentoId)
-          .order('prioridade'),
-        supabase
-          .from('esquadro_registro_horas')
-          .select('user_id, demanda_id, data, horas')
-          .gte('data', dateFrom)
-          .lte('data', dateTo),
-        supabase
-          .from('esquadro_profiles')
-          .select('id, nome, email')
-          .eq('ativo', true),
-      ]);
-
-      // Calculate total hours per demanda (all time)
-      const horasTotalRes = await supabase
-        .from('esquadro_registro_horas')
-        .select('demanda_id, horas')
-        .not('demanda_id', 'is', null);
-
-      const horasPorDemanda: Record<string, number> = {};
-      (horasTotalRes.data || []).forEach((r: any) => {
-        if (r.demanda_id) {
-          horasPorDemanda[r.demanda_id] = (horasPorDemanda[r.demanda_id] || 0) + (r.horas || 0);
-        }
-      });
-
-      // Weekly hours per user
-      const horasPorUsuario: Record<string, Record<string, number>> = {};
-      (horasRes.data || []).forEach((r: any) => {
-        if (!horasPorUsuario[r.user_id]) horasPorUsuario[r.user_id] = {};
-        horasPorUsuario[r.user_id][r.data] = (horasPorUsuario[r.user_id][r.data] || 0) + (r.horas || 0);
-      });
-
-      setPreviewData({
-        periodo: `${format(lastWeekStart, "dd/MM/yyyy")} a ${format(lastWeekEnd, "dd/MM/yyyy")}`,
-        demandas: (demandasRes.data || []).map((d: any) => ({
-          empreendimento: d.empreendimento?.nome || '—',
-          tipoProjeto: d.tipo_projeto?.nome || '—',
-          status: d.status?.nome || '—',
-          prioridade: d.prioridade || '—',
-          prazo: d.prazo ? format(new Date(d.prazo + 'T12:00:00'), 'dd/MM/yyyy') : '—',
-          inicio: d.created_at ? format(new Date(d.created_at), 'dd/MM/yyyy') : '—',
-          horasGastas: horasPorDemanda[d.id] ? horasPorDemanda[d.id].toFixed(1) : '0',
-        })),
-        horasUsuarios: (allUsuariosRes.data || []).map((u: any) => {
-          const userHoras = horasPorUsuario[u.id] || {};
-          const days: { data: string; horas: number }[] = [];
-          let total = 0;
-          for (let i = 0; i < 7; i++) {
-            const d = new Date(lastWeekStart);
-            d.setDate(d.getDate() + i);
-            const dateStr = format(d, 'yyyy-MM-dd');
-            const h = userHoras[dateStr] || 0;
-            days.push({ data: dateStr, horas: h });
-            total += h;
-          }
-          return { nome: u.nome || u.email, days, total };
-        }).filter((u: any) => u.total > 0),
-        lastWeekStart,
-      });
+      const data = await generatePreviewData();
+      setPreviewData(data);
       setPreviewOpen(true);
     } catch (err) {
       console.error('Erro ao gerar relatório:', err);
       toast({ title: 'Erro ao gerar relatório', variant: 'destructive' });
     } finally {
       setGeneratingPreview(false);
+    }
+  };
+
+  const handleSendEmail = async (reportId: string) => {
+    const report = reports.find((r) => r.id === reportId);
+    if (!report) return;
+
+    if (report.destinatarios.length === 0) {
+      toast({ title: 'Nenhum destinatário selecionado', description: 'Selecione ao menos um destinatário antes de enviar.', variant: 'destructive' });
+      return;
+    }
+
+    setSendingEmail(true);
+    try {
+      const recipientEmails = usuarios
+        .filter((u) => report.destinatarios.includes(u.id))
+        .map((u) => u.email);
+
+      // Call the Edge Function to send the email
+      const { data, error } = await supabase.functions.invoke('send-report-email', {
+        body: { reportId: report.id, recipients: recipientEmails },
+      });
+
+      if (error) {
+        toast({
+          title: 'Erro ao enviar e-mail',
+          description: 'A funcionalidade de envio por e-mail requer a configuração do Lovable Cloud. Habilite-o em Connectors → Lovable Cloud.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({ title: 'E-mails enviados com sucesso!' });
+        // Update ultimo_envio
+        const now = new Date().toISOString();
+        updateReport(reportId, { ultimo_envio: now } as any);
+      }
+    } catch (err) {
+      console.error('Erro ao enviar e-mail:', err);
+      toast({
+        title: 'Envio indisponível',
+        description: 'A funcionalidade de envio por e-mail requer a configuração de uma Edge Function. Habilite o Lovable Cloud para prosseguir.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSendingEmail(false);
     }
   };
 
@@ -290,6 +341,36 @@ const ConfigRelatorios = () => {
             </div>
 
             <AccordionContent className="pb-4">
+              {/* Automation schedule highlight */}
+              <div className="bg-muted/50 rounded-lg p-3 mb-4 flex items-start gap-3">
+                <CalendarClock className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold">Automação programada</span>
+                    <Badge
+                      variant={report.ativo ? 'default' : 'secondary'}
+                      className={report.ativo
+                        ? 'bg-accent/20 text-accent border-accent/30 text-[10px] px-1.5 py-0'
+                        : 'text-[10px] px-1.5 py-0'
+                      }
+                    >
+                      {report.ativo ? 'Ativa' : 'Desativada'}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      {report.frequencia} às {report.horario}
+                    </span>
+                    {report.ultimo_envio && (
+                      <span className="text-accent text-[11px]">
+                        Último envio: {format(new Date(report.ultimo_envio), "dd/MM/yyyy, HH:mm:ss")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <p className="text-sm text-muted-foreground mb-4">{report.descricao}</p>
 
               <div className="space-y-3">
@@ -322,24 +403,22 @@ const ConfigRelatorios = () => {
                   variant="outline"
                   size="sm"
                   className="gap-1.5 text-xs"
-                  onClick={generatePreview}
+                  onClick={handlePreview}
                   disabled={generatingPreview}
                 >
-                  <Send className="w-3.5 h-3.5" />
-                  {generatingPreview ? 'Gerando...' : 'Gerar Agora'}
+                  <Eye className="w-3.5 h-3.5" />
+                  {generatingPreview ? 'Carregando...' : 'Exibir'}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   className="gap-1.5 text-xs"
-                  onClick={() => {
-                    generatePreview();
-                  }}
-                  disabled={generatingPreview}
+                  onClick={() => handleSendEmail(report.id)}
+                  disabled={sendingEmail || report.destinatarios.length === 0}
                 >
-                  <Eye className="w-3.5 h-3.5" />
-                  Visualizar Relatório
+                  <Mail className="w-3.5 h-3.5" />
+                  {sendingEmail ? 'Enviando...' : 'Enviar por E-mail'}
                 </Button>
               </div>
             </AccordionContent>
