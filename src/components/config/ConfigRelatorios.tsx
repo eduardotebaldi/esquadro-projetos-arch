@@ -335,24 +335,14 @@ const ConfigRelatorios = () => {
         .filter((u) => report.destinatarios.includes(u.id))
         .map((u) => u.email);
 
-      const supabaseUrl = 'https://vvtympzatclvjaqucebr.supabase.co';
-      const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2dHltcHphdGNsdmphcXVjZWJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0NTI1NzYsImV4cCI6MjA4NjAyODU3Nn0.C8vWcljx6veAQ0hCi0ms7Ixm6NxhSdWBDeRgUy2Kz50';
-
-      const response = await fetch(`${supabaseUrl}/functions/v1/send-report-email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': supabaseAnonKey,
-        },
-        body: JSON.stringify({ reportId: report.id, recipients: recipientEmails }),
+      const { data, error } = await supabase.functions.invoke('send-report-email', {
+        body: { reportId: report.id, recipients: recipientEmails },
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
+      if (error) {
         toast({
           title: 'Erro ao enviar e-mail',
-          description: data?.error || 'Erro desconhecido ao enviar.',
+          description: error.message || 'Erro desconhecido ao enviar.',
           variant: 'destructive',
         });
       } else {
