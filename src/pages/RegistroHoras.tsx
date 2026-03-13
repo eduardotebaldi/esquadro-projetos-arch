@@ -52,6 +52,20 @@ type MotivoRow = {
 
 const EM_ANDAMENTO_ID = '819a3d87-3884-4223-ac1b-7262434f0828';
 
+const createTempId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint32Array(4);
+    crypto.getRandomValues(bytes);
+    return `tmp-${Array.from(bytes).map((b) => b.toString(16)).join('')}`;
+  }
+
+  return `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
 const RegistroHoras = () => {
   const { user, loading: authLoading } = useAuth();
   const [weekStart, setWeekStart] = useState(() =>
