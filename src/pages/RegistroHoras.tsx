@@ -53,7 +53,7 @@ type MotivoRow = {
 const EM_ANDAMENTO_ID = '819a3d87-3884-4223-ac1b-7262434f0828';
 
 const RegistroHoras = () => {
-  const { user, profile } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [weekStart, setWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
@@ -87,6 +87,7 @@ const RegistroHoras = () => {
   }, []);
 
   const fetchData = useCallback(async () => {
+    if (authLoading) return;
     if (!user) { setLoading(false); return; }
     setLoading(true);
 
@@ -167,7 +168,7 @@ const RegistroHoras = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, weekStart, filterStatus, filterEmpreendimentos]);
+  }, [authLoading, user, weekStart, filterStatus, filterEmpreendimentos]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
