@@ -53,7 +53,7 @@ type MotivoRow = {
 const EM_ANDAMENTO_ID = '819a3d87-3884-4223-ac1b-7262434f0828';
 
 const RegistroHoras = () => {
-  const { user, profile } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [weekStart, setWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
   );
@@ -87,6 +87,7 @@ const RegistroHoras = () => {
   }, []);
 
   const fetchData = useCallback(async () => {
+    if (authLoading) return;
     if (!user) { setLoading(false); return; }
     setLoading(true);
 
@@ -167,7 +168,7 @@ const RegistroHoras = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, weekStart, filterStatus, filterEmpreendimentos]);
+  }, [authLoading, user, weekStart, filterStatus, filterEmpreendimentos]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -493,10 +494,14 @@ const RegistroHoras = () => {
                       Ausências
                     </p>
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
                       className="h-6 text-xs gap-1 text-muted-foreground hover:text-foreground"
-                      onClick={() => setMotivoModalOpen(true)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setMotivoModalOpen(true);
+                      }}
                     >
                       <Plus className="w-3 h-3" />
                       Adicionar motivo
@@ -517,10 +522,14 @@ const RegistroHoras = () => {
                         {motivos.find((m: any) => m.id === row.motivoId)?.nome || 'Motivo desconhecido'}
                       </p>
                       <Button
+                        type="button"
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6 text-muted-foreground hover:text-destructive shrink-0"
-                        onClick={() => removeMotivoRow(row.tempId)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          removeMotivoRow(row.tempId);
+                        }}
                       >
                         <X className="w-3 h-3" />
                       </Button>
@@ -597,10 +606,14 @@ const RegistroHoras = () => {
           <div className="flex flex-col gap-2 py-4">
             {motivos.map((m: any) => (
               <Button
+                type="button"
                 key={m.id}
                 variant="outline"
                 className="justify-start text-sm h-10"
-                onClick={() => addMotivoRow(m.id)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  addMotivoRow(m.id);
+                }}
               >
                 {m.nome}
               </Button>

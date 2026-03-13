@@ -13,14 +13,14 @@ const HORAS_PADRAO: Record<number, number> = {
 const ALOCACAO_INICIO = new Date('2026-02-23');
 
 const PendenciasModal = () => {
-  const { profile } = useAuth();
+  const { profile, loading } = useAuth();
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [gaps, setGaps] = useState<{ data: string; esperado: number; alocado: number }[]>([]);
   const [totalFaltante, setTotalFaltante] = useState(0);
 
   useEffect(() => {
-    if (profile?.role !== 'arquiteta') return;
+    if (loading || location.pathname === '/horas' || profile?.role !== 'arquiteta') return;
 
     const checkPendencias = async () => {
       try {
@@ -71,9 +71,9 @@ const PendenciasModal = () => {
     };
 
     checkPendencias();
-  }, [location.pathname, profile?.id, profile?.role]);
+  }, [loading, location.pathname, profile?.id, profile?.role]);
 
-  if (profile?.role !== 'arquiteta' || gaps.length === 0) return null;
+  if (loading || location.pathname === '/horas' || profile?.role !== 'arquiteta' || gaps.length === 0) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -98,7 +98,7 @@ const PendenciasModal = () => {
           ))}
         </div>
         <div className="flex justify-end mt-2">
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button type="button" variant="outline" onClick={() => setOpen(false)}>
             Entendi
           </Button>
         </div>
