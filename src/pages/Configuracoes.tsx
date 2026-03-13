@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ConfigCrudTable from '@/components/config/ConfigCrudTable';
 import ConfigUsuarios from '@/components/config/ConfigUsuarios';
+import ConfigRelatorios from '@/components/config/ConfigRelatorios';
 
 const statusColumns = [
   { key: 'nome', label: 'Nome', type: 'text' as const },
@@ -27,6 +28,7 @@ const Configuracoes = () => {
           <TabsTrigger value="empreendimentos">Empreendimentos</TabsTrigger>
           <TabsTrigger value="motivos">Motivos</TabsTrigger>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
+          <TabsTrigger value="relatorios">Relatórios</TabsTrigger>
         </TabsList>
 
         <TabsContent value="status">
@@ -64,6 +66,10 @@ const Configuracoes = () => {
 
         <TabsContent value="usuarios">
           <ConfigUsuarios />
+        </TabsContent>
+
+        <TabsContent value="relatorios">
+          <ConfigRelatorios />
         </TabsContent>
       </Tabs>
     </div>
