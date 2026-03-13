@@ -90,72 +90,83 @@ const RegistroHoras = () => {
     if (!user) { setLoading(false); return; }
     setLoading(true);
 
-    const dateFrom = format(weekStart, 'yyyy-MM-dd');
-    const dateTo = format(endOfWeek(weekStart, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    try {
+      const dateFrom = format(weekStart, 'yyyy-MM-dd');
+      const dateTo = format(endOfWeek(weekStart, { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
-    let demandasQuery = supabase
-      .from('esquadro_demandas')
-      .select(`id, empreendimento_id, empreendimento:esquadro_empreendimentos(nome), tipo_projeto:esquadro_tipos_projeto(nome), status:esquadro_status(nome), status_id`)
-      .order('prioridade');
+      let demandasQuery = supabase
+        .from('esquadro_demandas')
+        .select(`id, empreendimento_id, empreendimento:esquadro_empreendimentos(nome), tipo_projeto:esquadro_tipos_projeto(nome), status:esquadro_status(nome), status_id`)
+        .order('prioridade');
 
-    if (filterStatus !== 'all') {
-      demandasQuery = demandasQuery.eq('status_id', filterStatus);
-    }
-    if (filterEmpreendimentos.length > 0) {
-      demandasQuery = demandasQuery.in('empreendimento_id', filterEmpreendimentos);
-    }
-
-    const [demandasRes, horasRes, motivosRes] = await Promise.all([
-      demandasQuery,
-      supabase
-        .from('esquadro_registro_horas')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('data', dateFrom)
-        .lte('data', dateTo),
-      supabase
-        .from('esquadro_motivos_nao_trabalho')
-        .select('*')
-        .eq('ativo', true)
-        .order('nome'),
-    ]);
-
-    if (demandasRes.error || horasRes.error || motivosRes.error) {
-      toast({ title: 'Erro ao carregar dados', description: demandasRes.error?.message || horasRes.error?.message || motivosRes.error?.message, variant: 'destructive' });
-      setLoading(false);
-      return;
-    }
-
-    setDemandas(demandasRes.data || []);
-    setMotivos(motivosRes.data || []);
-
-    const cellMap: Record<CellKey, CellData> = {};
-    // Group motivo entries by motivo_id to build rows
-    const motivoMap: Record<string, Record<string, number>> = {};
-
-    (horasRes.data || []).forEach((r: any) => {
-      if (r.demanda_id) {
-        cellMap[`${r.demanda_id}__${r.data}`] = {
-          id: r.id,
-          horas: r.horas ?? '',
-          motivo_nao_trabalho_id: null,
-        };
-      } else if (r.motivo_nao_trabalho_id) {
-        if (!motivoMap[r.motivo_nao_trabalho_id]) motivoMap[r.motivo_nao_trabalho_id] = {};
-        motivoMap[r.motivo_nao_trabalho_id][r.data] = r.horas || 0;
+      if (filterStatus !== 'all') {
+        demandasQuery = demandasQuery.eq('status_id', filterStatus);
       }
-    });
+      if (filterEmpreendimentos.length > 0) {
+        demandasQuery = demandasQuery.in('empreendimento_id', filterEmpreendimentos);
+      }
 
-    setCells(cellMap);
+      const [demandasRes, horasRes, motivosRes] = await Promise.all([
+        demandasQuery,
+        supabase
+          .from('esquadro_registro_horas')
+          .select('*')
+          .eq('user_id', user.id)
+          .gte('data', dateFrom)
+          .lte('data', dateTo),
+        supabase
+          .from('esquadro_motivos_nao_trabalho')
+          .select('*')
+          .eq('ativo', true)
+          .order('nome'),
+      ]);
 
-    // Build motivo rows from existing data
-    const rows: MotivoRow[] = Object.entries(motivoMap).map(([motivoId, horas]) => ({
-      tempId: crypto.randomUUID(),
-      motivoId,
-      horas: Object.fromEntries(Object.entries(horas).map(([d, h]) => [d, h || ''])),
-    }));
-    setMotivoRows(rows);
-    setLoading(false);
+      if (demandasRes.error) {
+        console.error('Erro ao carregar demandas:', demandasRes.error.message);
+        toast({ title: 'Erro ao carregar demandas', description: demandasRes.error.message, variant: 'destructive' });
+      }
+      if (horasRes.error) {
+        console.error('Erro ao carregar horas:', horasRes.error.message);
+        toast({ title: 'Erro ao carregar horas', description: horasRes.error.message, variant: 'destructive' });
+      }
+      if (motivosRes.error) {
+        console.error('Erro ao carregar motivos:', motivosRes.error.message);
+        toast({ title: 'Erro ao carregar motivos de ausência', description: motivosRes.error.message, variant: 'destructive' });
+      }
+
+      setDemandas(demandasRes.data || []);
+      setMotivos(motivosRes.data || []);
+
+      const cellMap: Record<CellKey, CellData> = {};
+      const motivoMap: Record<string, Record<string, number>> = {};
+
+      (horasRes.data || []).forEach((r: any) => {
+        if (r.demanda_id) {
+          cellMap[`${r.demanda_id}__${r.data}`] = {
+            id: r.id,
+            horas: r.horas ?? '',
+            motivo_nao_trabalho_id: null,
+          };
+        } else if (r.motivo_nao_trabalho_id) {
+          if (!motivoMap[r.motivo_nao_trabalho_id]) motivoMap[r.motivo_nao_trabalho_id] = {};
+          motivoMap[r.motivo_nao_trabalho_id][r.data] = r.horas || 0;
+        }
+      });
+
+      setCells(cellMap);
+
+      const rows: MotivoRow[] = Object.entries(motivoMap).map(([motivoId, horas]) => ({
+        tempId: crypto.randomUUID(),
+        motivoId,
+        horas: Object.fromEntries(Object.entries(horas).map(([d, h]) => [d, h || ''])),
+      }));
+      setMotivoRows(rows);
+    } catch (err) {
+      console.error('Erro inesperado ao carregar dados:', err);
+      toast({ title: 'Erro inesperado', description: 'Não foi possível carregar os dados. Tente recarregar a página.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
   }, [user, weekStart, filterStatus, filterEmpreendimentos]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
