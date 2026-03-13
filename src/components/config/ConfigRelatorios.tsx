@@ -258,10 +258,10 @@ const ConfigRelatorios = () => {
       const demandaIds = [...new Set(userRegs.filter((r: any) => r.demanda_id).map((r: any) => r.demanda_id))];
 
       const userDemandas: PreviewUserDemanda[] = demandaIds.map((dId) => {
-        const dem = allDemandas.find((d: any) => d.id === dId);
-        const label = dem
-          ? `${dem.empreendimento?.nome || '—'} · ${dem.tipo_projeto?.nome || '—'}`
-          : 'Demanda desconhecida';
+        const dem: any = allDemandas.find((d: any) => d.id === dId);
+        const empNome = dem?.empreendimento?.nome || '—';
+        const tipoNome = dem?.tipo_projeto?.nome || '—';
+        const label = dem ? `${empNome} · ${tipoNome}` : 'Demanda desconhecida';
 
         const horasPorDia: Record<string, number> = {};
         userRegs.filter((r: any) => r.demanda_id === dId).forEach((r: any) => {
