@@ -337,12 +337,14 @@ const ConfigRelatorios = () => {
 
       const { data, error } = await supabase.functions.invoke('send-report-email', {
         body: { reportId: report.id, recipients: recipientEmails },
+        headers: { Authorization: '' },
       });
 
       if (error) {
+        const errorBody = typeof data === 'object' ? data?.error : error.message;
         toast({
           title: 'Erro ao enviar e-mail',
-          description: error.message || 'Erro desconhecido ao enviar.',
+          description: errorBody || 'Erro desconhecido ao enviar.',
           variant: 'destructive',
         });
       } else {
