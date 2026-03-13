@@ -98,7 +98,7 @@ const PendenciasModal = () => {
           ))}
         </div>
         <div className="flex justify-end mt-2">
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button type="button" variant="outline" onClick={() => setOpen(false)}>
             Entendi
           </Button>
         </div>
