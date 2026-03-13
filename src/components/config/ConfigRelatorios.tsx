@@ -335,16 +335,26 @@ const ConfigRelatorios = () => {
         .filter((u) => report.destinatarios.includes(u.id))
         .map((u) => u.email);
 
-      const { data, error } = await supabase.functions.invoke('send-report-email', {
-        body: { reportId: report.id, recipients: recipientEmails },
-        headers: { Authorization: '' },
+      const supabaseUrl = 'https://vvtympzatclvjaqucebr.supabase.co';
+      const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2dHltcHphdGNsdmphcXVjZWJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0NTI1NzYsImV4cCI6MjA4NjAyODU3Nn0.C8vWcljx6veAQ0hCi0ms7Ixm6NxhSdWBDeRgUy2Kz50';
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/send-report-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${supabaseAnonKey}`,
+        },
+        body: JSON.stringify({ reportId: report.id, recipients: recipientEmails }),
       });
 
-      if (error) {
-        const errorBody = typeof data === 'object' ? data?.error : error.message;
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const errorBody = data?.error || data?.message || 'Erro desconhecido ao enviar.';
         toast({
           title: 'Erro ao enviar e-mail',
-          description: errorBody || 'Erro desconhecido ao enviar.',
+          description: errorBody,
           variant: 'destructive',
         });
       } else {
