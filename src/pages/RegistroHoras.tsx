@@ -171,7 +171,7 @@ const RegistroHoras = () => {
       setCells(cellMap);
 
       const rows: MotivoRow[] = Object.entries(motivoMap).map(([motivoId, horas]) => ({
-        tempId: crypto.randomUUID(),
+        tempId: createTempId(),
         motivoId,
         horas: Object.fromEntries(Object.entries(horas).map(([d, h]) => [d, h || ''])),
       }));
@@ -197,7 +197,7 @@ const RegistroHoras = () => {
 
   const addMotivoRow = (motivoId: string) => {
     if (!motivoId) return;
-    setMotivoRows((prev) => [...prev, { tempId: crypto.randomUUID(), motivoId, horas: {} }]);
+    setMotivoRows((prev) => [...prev, { tempId: createTempId(), motivoId, horas: {} }]);
     setMotivoModalOpen(false);
   };
 
