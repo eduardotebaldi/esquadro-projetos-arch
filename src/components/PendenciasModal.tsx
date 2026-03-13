@@ -23,41 +23,50 @@ const PendenciasModal = () => {
     if (profile?.role !== 'arquiteta') return;
 
     const checkPendencias = async () => {
-      const ontem = startOfDay(subDays(new Date(), 1));
-      const inicioAlocacao = startOfDay(ALOCACAO_INICIO);
-      if (isBefore(ontem, inicioAlocacao)) return;
+      try {
+        const ontem = startOfDay(subDays(new Date(), 1));
+        const inicioAlocacao = startOfDay(ALOCACAO_INICIO);
+        if (isBefore(ontem, inicioAlocacao)) return;
 
-      const { data: allHoras } = await supabase
-        .from('esquadro_registro_horas')
-        .select('data, horas')
-        .eq('user_id', profile.id)
-        .gte('data', format(inicioAlocacao, 'yyyy-MM-dd'))
-        .lte('data', format(ontem, 'yyyy-MM-dd'));
+        const { data: allHoras, error } = await supabase
+          .from('esquadro_registro_horas')
+          .select('data, horas')
+          .eq('user_id', profile.id)
+          .gte('data', format(inicioAlocacao, 'yyyy-MM-dd'))
+          .lte('data', format(ontem, 'yyyy-MM-dd'));
 
-      const horasMap: Record<string, number> = {};
-      (allHoras || []).forEach((r: any) => {
-        horasMap[r.data] = (horasMap[r.data] || 0) + (r.horas || 0);
-      });
-
-      const diasCheck = eachDayOfInterval({ start: inicioAlocacao, end: ontem });
-      const pendGaps: typeof gaps = [];
-
-      diasCheck.forEach((dia) => {
-        const esperado = HORAS_PADRAO[getDay(dia)] || 0;
-        if (esperado === 0) return;
-        const dateStr = format(dia, 'yyyy-MM-dd');
-        const alocado = horasMap[dateStr] || 0;
-        if (alocado < esperado) {
-          pendGaps.push({ data: dateStr, esperado, alocado });
+        if (error) {
+          console.error('Erro ao verificar pendências:', error.message);
+          return;
         }
-      });
 
-      if (pendGaps.length > 0) {
-        setGaps(pendGaps);
-        setTotalFaltante(pendGaps.reduce((s, g) => s + (g.esperado - g.alocado), 0));
-        setOpen(true);
-      } else {
-        setOpen(false);
+        const horasMap: Record<string, number> = {};
+        (allHoras || []).forEach((r: any) => {
+          horasMap[r.data] = (horasMap[r.data] || 0) + (r.horas || 0);
+        });
+
+        const diasCheck = eachDayOfInterval({ start: inicioAlocacao, end: ontem });
+        const pendGaps: typeof gaps = [];
+
+        diasCheck.forEach((dia) => {
+          const esperado = HORAS_PADRAO[getDay(dia)] || 0;
+          if (esperado === 0) return;
+          const dateStr = format(dia, 'yyyy-MM-dd');
+          const alocado = horasMap[dateStr] || 0;
+          if (alocado < esperado) {
+            pendGaps.push({ data: dateStr, esperado, alocado });
+          }
+        });
+
+        if (pendGaps.length > 0) {
+          setGaps(pendGaps);
+          setTotalFaltante(pendGaps.reduce((s, g) => s + (g.esperado - g.alocado), 0));
+          setOpen(true);
+        } else {
+          setOpen(false);
+        }
+      } catch (err) {
+        console.error('Erro inesperado em PendenciasModal:', err);
       }
     };
 
